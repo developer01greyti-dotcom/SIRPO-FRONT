@@ -1,0 +1,6 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="DEVIDA">
+  <rect width="128" height="128" fill="white"/>
+  <path d="M10 20 L54 20 L80 84 L36 84 Z" fill="#1ea7d6"/>
+  <path d="M46 20 L90 20 L116 84 L72 84 Z" fill="#18a957"/>
+  <path d="M28 84 L72 84 L90 116 L46 116 Z" fill="#0f8d4f"/>
+</svg>

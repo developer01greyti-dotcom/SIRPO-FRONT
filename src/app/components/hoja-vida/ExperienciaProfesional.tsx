@@ -1,0 +1,363 @@
+import { Briefcase, Plus, Edit2, Trash2, MoreVertical, Eye } from 'lucide-react';
+import { Button } from '../ui/button';
+import { useEffect, useState } from 'react';
+import { ExperienciaForm } from './ExperienciaForm';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { PdfViewer } from '../PdfViewer';
+import { fetchHojaVidaActual, fetchHvExpList } from '../../api/hojaVida';
+import type { LoginResponse } from '../../api/auth';
+
+interface Experiencia {
+  id: string;
+  idHvExperiencia?: string;
+  tipoExperiencia: string;
+  tipoExperienciaId?: string;
+  tipoEntidad: string;
+  tipoEntidadId?: string;
+  nombreEntidad: string;
+  distritoId?: string;
+  distritoDescripcion?: string;
+  area: string;
+  cargo: string;
+  funcionesPrincipales: string;
+  motivoCese: string;
+  motivoCeseId?: string;
+  fechaInicio: string;
+  fechaFin: string;
+  certificadoPreview: string | null;
+}
+
+export function ExperienciaProfesional({ user }: { user: LoginResponse | null }) {
+  const [experiencias, setExperiencias] = useState<Experiencia[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hojaVidaId, setHojaVidaId] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [vistaActual, setVistaActual] = useState<'lista' | 'formulario' | 'pdf-viewer'>('lista');
+  const [modoFormulario, setModoFormulario] = useState<'crear' | 'editar'>('crear');
+  const [experienciaToEdit, setExperienciaToEdit] = useState<Experiencia | null>(null);
+  const [dialogEliminar, setDialogEliminar] = useState(false);
+  const [experienciaToDelete, setExperienciaToDelete] = useState<string | null>(null);
+  
+  // Estados para el visor de PDF
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [pdfTitle, setPdfTitle] = useState('');
+
+  const buildFileUrl = (guid: string) => {
+    const apiBaseUrl =
+      (import.meta as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ||
+      'http://localhost:8087/sirpo/v1';
+    const params = new URLSearchParams({ guid });
+    return `${apiBaseUrl}/hv_ref_archivo/file?${params.toString()}`;
+  };
+
+  const normalizeExperiencias = (items: any[]): Experiencia[] => {
+    return items.map((item, index) => ({
+      id: String(item.id ?? item.idHvExperiencia ?? index),
+      idHvExperiencia: String(item.idHvExperiencia ?? ''),
+      tipoExperiencia: item.tipoExperiencia ?? '',
+      tipoExperienciaId: item.tipoExperienciaId ?? '',
+      tipoEntidad: item.tipoEntidad ?? '',
+      tipoEntidadId: item.tipoEntidadId ?? '',
+      nombreEntidad: item.nombreEntidad ?? '',
+      distritoId: item.distritoId ?? '',
+      distritoDescripcion: item.distritoDescripcion ?? '',
+      area: item.area ?? '',
+      cargo: item.cargo ?? '',
+      funcionesPrincipales: item.funcionesPrincipales ?? '',
+      motivoCese: item.motivoCese ?? '',
+      motivoCeseId: item.motivoCeseId ?? '',
+      fechaInicio: item.fechaInicio ?? '',
+      fechaFin: item.fechaFin ?? '',
+      certificadoPreview: item.archivoGuid ? buildFileUrl(String(item.archivoGuid)) : null,
+    }));
+  };
+
+  const handleAgregarExperiencia = () => {
+    setModoFormulario('crear');
+    setExperienciaToEdit(null);
+    setVistaActual('formulario');
+  };
+
+  const handleEditarExperiencia = (experiencia: Experiencia) => {
+    setModoFormulario('editar');
+    setExperienciaToEdit(experiencia);
+    setVistaActual('formulario');
+  };
+
+  const handleEliminarExperiencia = (id: string) => {
+    setExperienciaToDelete(id);
+    setDialogEliminar(true);
+  };
+
+  const confirmarEliminar = () => {
+    if (experienciaToDelete) {
+      setExperiencias(experiencias.filter((e) => e.id !== experienciaToDelete));
+      setDialogEliminar(false);
+      setExperienciaToDelete(null);
+    }
+  };
+
+  const handleSaveExperiencia = () => {
+    setRefreshKey((prev) => prev + 1);
+    setVistaActual('lista');
+    setExperienciaToEdit(null);
+  };
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadExperiencias = async () => {
+      if (!user?.idPersona || !user?.idUsuario) {
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const hvActual = await fetchHojaVidaActual(user.idPersona, user.idUsuario);
+        const idHojaVida = Array.isArray(hvActual)
+          ? hvActual[0]?.idHojaVida
+          : hvActual?.idHojaVida;
+
+        if (!idHojaVida) {
+          if (isActive) {
+            setExperiencias([]);
+          }
+          return;
+        }
+        setHojaVidaId(idHojaVida);
+        const expData = await fetchHvExpList(idHojaVida);
+        if (!isActive) {
+          return;
+        }
+        const items = Array.isArray(expData) ? expData : expData ? [expData] : [];
+        setExperiencias(normalizeExperiencias(items));
+      } catch (error) {
+        if (isActive) {
+          setLoadError('No se pudo cargar la experiencia profesional.');
+          setExperiencias([]);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadExperiencias();
+    return () => {
+      isActive = false;
+    };
+  }, [user?.idPersona, user?.idUsuario, refreshKey]);
+
+  const formatFecha = (fecha: string) => {
+    if (!fecha) return '-';
+    const date = new Date(fecha);
+    return date.toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const getTipoExperienciaLabel = (tipo: string) => {
+    const labels: Record<string, string> = {
+      'empleo': 'Empleo',
+      'practicas-profesionales': 'Prácticas profesionales',
+      'practicas-pre-profesionales': 'Prácticas pre-profesionales',
+    };
+    return labels[tipo] || tipo;
+  };
+
+  const getTipoEntidadLabel = (tipo: string) => {
+    const labels: Record<string, string> = {
+      'publico': 'Público',
+      'privado': 'Privado',
+    };
+    return labels[tipo] || tipo;
+  };
+
+  const getMotivoCeseLabel = (motivo: string) => {
+    const labels: Record<string, string> = {
+      'despido': 'Despido',
+      'fin-contrato': 'Fin del contrato',
+      'renuncia': 'Renuncia',
+      'actualidad': 'Hasta la actualidad',
+    };
+    return labels[motivo] || motivo;
+  };
+
+  return (
+    <>
+      {vistaActual === 'lista' ? (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="p-6">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-bold" style={{ color: '#04a25c' }}>
+                  Experiencia Profesional
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Detalla tu experiencia laboral relevante
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={handleAgregarExperiencia}
+                className="gap-2 bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="w-4 h-4" />
+                Agregar
+              </Button>
+            </div>
+
+            {/* Listado de Experiencias */}
+            {isLoading ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed text-gray-600">
+                Cargando experiencia profesional...
+              </div>
+            ) : loadError ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed text-red-600">
+                {loadError}
+              </div>
+            ) : experiencias.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">#</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Cargo</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Entidad</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Tipo Experiencia</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Tipo Entidad</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Periodo</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Motivo de Cese</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Certificado</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {experiencias.map((experiencia, index) => (
+                      <tr key={experiencia.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{experiencia.cargo || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{experiencia.nombreEntidad || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {getTipoExperienciaLabel(experiencia.tipoExperiencia)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {getTipoEntidadLabel(experiencia.tipoEntidad)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {experiencia.motivoCese === 'actualidad'
+                            ? `${formatFecha(experiencia.fechaInicio)} - Actualidad`
+                            : `${formatFecha(experiencia.fechaInicio)} - ${formatFecha(experiencia.fechaFin)}`}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {getMotivoCeseLabel(experiencia.motivoCese)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                          {experiencia.certificadoPreview ? (
+                            <span className="text-green-600 font-medium">Con archivo</span>
+                          ) : (
+                            'Sin archivo'
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditarExperiencia(experiencia)}>
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEliminarExperiencia(experiencia.id)} className="text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                              {experiencia.certificadoPreview && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setVistaActual('pdf-viewer');
+                                    setPdfUrl(experiencia.certificadoPreview || '');
+                                    setPdfTitle(`Certificado - ${experiencia.cargo}`);
+                                  }}
+                                >
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Ver
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
+                <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm text-gray-600">No hay experiencias profesionales registradas</p>
+                <p className="text-xs text-gray-500 mt-1">Haz clic en "Agregar" para comenzar</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : vistaActual === 'formulario' ? (
+        <ExperienciaForm
+          modo={modoFormulario}
+          experiencia={experienciaToEdit}
+          onGuardar={handleSaveExperiencia}
+          idHojaVida={hojaVidaId}
+          usuarioAccion={user?.idUsuario || 0}
+          onCancelar={() => {
+            setVistaActual('lista');
+            setExperienciaToEdit(null);
+          }}
+        />
+      ) : (
+        <PdfViewer
+          url={pdfUrl}
+          title={pdfTitle}
+          onVolver={() => setVistaActual('lista')}
+        />
+      )}
+
+      {/* Diálogo de confirmación para eliminar */}
+      <Dialog open={dialogEliminar} onOpenChange={setDialogEliminar}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar experiencia profesional?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente este registro de experiencia profesional.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogEliminar(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmarEliminar}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
