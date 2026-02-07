@@ -86,6 +86,22 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     }));
   };
 
+  const parseFecha = (value: string): Date | null => {
+    if (!value) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      const [year, month, day] = value.split('-');
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+    if (value.includes('/')) {
+      const [dd, mm, yyyy] = value.split('/');
+      if (dd && mm && yyyy) {
+        return new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      }
+    }
+    const fallback = new Date(value);
+    return Number.isNaN(fallback.getTime()) ? null : fallback;
+  };
+
   const handleAgregarExperiencia = () => {
     setModoFormulario('crear');
     setExperienciaToEdit(null);
@@ -171,6 +187,25 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     return date.toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
+  const totalExperiencia = (() => {
+    let totalDays = 0;
+    experiencias.forEach((exp) => {
+      const start = parseFecha(exp.fechaInicio);
+      if (!start) return;
+      const end =
+        exp.motivoCese === 'actualidad'
+          ? new Date()
+          : parseFecha(exp.fechaFin) ?? new Date();
+      if (end < start) return;
+      const diffDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+      totalDays += diffDays;
+    });
+    const years = Math.floor(totalDays / 365);
+    const months = Math.floor((totalDays % 365) / 30);
+    const days = totalDays % 30;
+    return { years, months, days, totalDays };
+  })();
+
   const getTipoExperienciaLabel = (tipo: string) => {
     const labels: Record<string, string> = {
       'empleo': 'Empleo',
@@ -212,14 +247,21 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
                   Detalla tu experiencia laboral relevante
                 </p>
               </div>
-              <Button
-                type="button"
-                onClick={handleAgregarExperiencia}
-                className="gap-2 bg-green-600 hover:bg-green-700"
-              >
-                <Plus className="w-4 h-4" />
-                Agregar
-              </Button>
+              <div className="flex items-start gap-4">
+                {totalExperiencia.totalDays > 0 && (
+                  <p className="text-sm text-gray-700 whitespace-nowrap mt-1">
+                    Total de experiencia: {totalExperiencia.years} años, {totalExperiencia.months} meses, {totalExperiencia.days} días
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  onClick={handleAgregarExperiencia}
+                  className="gap-2 bg-green-600 hover:bg-green-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  Agregar
+                </Button>
+              </div>
             </div>
 
             {/* Listado de Experiencias */}

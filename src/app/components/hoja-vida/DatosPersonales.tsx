@@ -73,6 +73,7 @@ type DatosPersonalesForm = {
   telefonoCelular: string;
 
   correo: string;
+  correoSecundario: string;
 
   ruc: string;
 
@@ -113,6 +114,7 @@ const emptyForm: DatosPersonalesForm = {
   telefonoCelular: '',
 
   correo: '',
+  correoSecundario: '',
 
   ruc: '',
 
@@ -173,6 +175,14 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
   const [voucherDeleted, setVoucherDeleted] = useState(false);
 
   const [showVoucherModal, setShowVoucherModal] = useState(false);
+
+  const [rnpPreview, setRnpPreview] = useState<string | null>(null);
+  const [rnpFile, setRnpFile] = useState<File | null>(null);
+  const [rnpRefId, setRnpRefId] = useState<number>(0);
+  const [rnpFileUrl, setRnpFileUrl] = useState<string | null>(null);
+  const [rnpMime, setRnpMime] = useState<string | null>(null);
+  const [rnpDeleted, setRnpDeleted] = useState(false);
+  const [showRnpModal, setShowRnpModal] = useState(false);
 
   const [seguroSaludPreview, setSeguroSaludPreview] = useState<string | null>(null);
 
@@ -406,11 +416,15 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
         const voucher = items.find((i) => i.tipoArchivo === 'HV_VOUCHER_BN');
 
+        const rnp = items.find((i) => i.tipoArchivo === 'HV_RNP_CONSTANCIA');
+
         const seguro = items.find((i) => i.tipoArchivo === 'HV_SEGURO_SALUD');
 
         const sctr = items.find((i) => i.tipoArchivo === 'HV_SCTR');
 
         setVoucherRefId(voucher?.idHvRefArchivo || 0);
+
+        setRnpRefId(rnp?.idHvRefArchivo || 0);
 
         setSeguroRefId(seguro?.idHvRefArchivo || 0);
 
@@ -418,11 +432,15 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
         setVoucherFileUrl(voucher ? buildFileUrl(voucher.guid) : null);
 
+        setRnpFileUrl(rnp ? buildFileUrl(rnp.guid) : null);
+
         setSeguroFileUrl(seguro ? buildFileUrl(seguro.guid) : null);
 
         setSctrFileUrl(sctr ? buildFileUrl(sctr.guid) : null);
 
         setVoucherMime(voucher?.mime || null);
+
+        setRnpMime(rnp?.mime || null);
 
         setSeguroMime(seguro?.mime || null);
 
@@ -638,7 +656,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
     mime: string | null,
 
-    type: 'voucher' | 'seguro' | 'sctr',
+    type: 'voucher' | 'seguro' | 'sctr' | 'rnp',
 
   ) => {
 
@@ -667,6 +685,15 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
       setSctrPreview(url);
 
       setShowSctrModal(true);
+
+      return;
+
+    }
+    if (type === 'rnp') {
+
+      setRnpPreview(url);
+
+      setShowRnpModal(true);
 
       return;
 
@@ -783,6 +810,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
         telefonoCelular: formData.telefonoCelular,
 
         correo: formData.correo,
+        correoSecundario: formData.correoSecundario,
 
         ruc: formData.ruc,
 
@@ -826,6 +854,14 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             setVoucherDeleted(false);
 
+          }
+
+          if (rnpFile) {
+            await upsertArchivo(rnpFile, 'HV_RNP_CONSTANCIA', rnpRefId, currentHvDatosId);
+            setRnpDeleted(false);
+          } else if (rnpDeleted && rnpRefId) {
+            await deleteArchivo(rnpRefId);
+            setRnpDeleted(false);
           }
 
 
@@ -956,6 +992,30 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
   };
 
+
+  const handleRnpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setRnpFile(file);
+      setRnpDeleted(false);
+      revokePreviewUrl(rnpPreview);
+      setRnpPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const removeRnp = () => {
+    revokePreviewUrl(rnpPreview);
+    setRnpPreview(null);
+    setRnpFile(null);
+    setRnpFileUrl(null);
+    if (rnpRefId) {
+      setRnpDeleted(true);
+    }
+    const fileInput = document.getElementById('rnpConstancia') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
 
 
   const handleSeguroSaludChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1396,11 +1456,11 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
 
 
-            {/* Correo Electrónico - Ocupa toda la fila */}
+            {/* Correo electrónico principal - Ocupa toda la fila */}
 
             <div className="space-y-2">
 
-              <Label htmlFor="correo">Correo electrónico *</Label>
+              <Label htmlFor="correo">Correo electrónico principal *</Label>
 
               <div className="relative">
 
@@ -1419,6 +1479,38 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                   value={formData.correo}
 
                   onChange={(e) => updateField('correo', e.target.value)}
+
+                  required
+
+                />
+
+              </div>
+
+            </div>
+
+            {/* Correo electrónico secundario */}
+
+            <div className="space-y-2">
+
+              <Label htmlFor="correoSecundario">Correo electrónico secundario *</Label>
+
+              <div className="relative">
+
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+
+                <Input
+
+                  id="correoSecundario"
+
+                  type="email"
+
+                  placeholder=""
+
+                  className="pl-10"
+
+                  value={formData.correoSecundario}
+
+                  onChange={(e) => updateField('correoSecundario', e.target.value)}
 
                   required
 
@@ -1674,6 +1766,118 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             </div>
 
+
+            {/* Registro Nacional de Proveedores (constancia) */}
+
+            <div className="space-y-2 md:col-span-2">
+
+              <Label htmlFor="rnpConstancia">Registro Nacional de Proveedores (constancia)</Label>
+
+              <div className="space-y-2">
+
+                <label
+
+                  htmlFor="rnpConstancia"
+
+                  className="flex items-center justify-center gap-2 px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-colors"
+
+                >
+
+                  <Upload className="w-5 h-5 text-gray-400" />
+
+                  <span className="text-sm text-gray-600">
+
+                    {rnpPreview ? 'Cambiar documento' : 'Seleccionar documento'}
+
+                  </span>
+
+                </label>
+
+                <input
+
+                  id="rnpConstancia"
+
+                  type="file"
+
+                  accept="image/*,application/pdf"
+
+                  className="hidden"
+
+                  onChange={handleRnpChange}
+
+                />
+
+                <p className="text-xs text-gray-500">Elija un documento de extensión PDF o imagen y de tamaño menor a 100 MB</p>
+
+                
+
+                {(Boolean(rnpPreview) || rnpRefId > 0) && (
+
+                  <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
+
+                    <div className="flex-1">
+
+                      <p className="text-sm font-medium text-green-900">Constancia adjuntada correctamente</p>
+
+                      <p className="text-xs text-green-700">Click en "Ver" para visualizar el archivo</p>
+
+                    </div>
+
+                    <div className="flex gap-2">
+
+                      {(rnpPreview || rnpFileUrl) && (
+
+                        <Button
+
+                          type="button"
+
+                          variant="outline"
+
+                          size="sm"
+
+                          className="gap-2"
+
+                          onClick={() => openFile(rnpPreview || rnpFileUrl, rnpMime || (rnpFile?.type ?? null), 'rnp')}
+
+                        >
+
+                          <Eye className="w-4 h-4" />
+
+                          Ver
+
+                        </Button>
+
+                      )}
+
+                      <Button
+
+                        type="button"
+
+                        variant="outline"
+
+                        size="sm"
+
+                        className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+
+                        onClick={removeRnp}
+
+                      >
+
+                        <X className="w-4 h-4" />
+
+                        Eliminar
+
+                      </Button>
+
+                    </div>
+
+                  </div>
+
+                )}
+
+              </div>
+
+            </div>
 
 
             {/* Seguro de Salud - Ocupa toda la fila */}
@@ -2232,6 +2436,42 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
       )}
 
+
+      {/* Modal para ver constancia RNP */}
+
+      {showRnpModal && (
+
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+
+          <div className="relative max-w-2xl bg-white p-6">
+
+            <button
+
+              className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
+
+              onClick={() => setShowRnpModal(false)}
+
+            >
+
+              <X className="h-5 w-5" />
+
+            </button>
+
+            <img
+
+              src={rnpPreview}
+
+              alt="Constancia RNP"
+
+              className="max-h-96 w-full object-contain"
+
+            />
+
+          </div>
+
+        </div>
+
+      )}
 
 
       {/* Modal para ver el seguro de salud */}

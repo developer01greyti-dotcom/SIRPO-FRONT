@@ -31,12 +31,14 @@ import { GestionUsuariosAdmin } from './components/admin/GestionUsuariosAdmin';
 import type { LoginResponse } from './api/auth';
 import { fetchConvocatoriasList } from './api/convocatorias';
 import { fetchHojaVidaActual } from './api/hojaVida';
+import { fetchPostulacionesByPersona, upsertPostulacion, type PostulacionListItem } from './api/postulaciones';
 
 interface Convocatoria {
   id: string;
   nombre: string;
   oficinaZonal: string;
   oficinaCoordinacion: string;
+  idOficinaZonal?: number;
   perfil: string;
   fechaInicio: string;
   fechaFin: string;
@@ -157,82 +159,6 @@ export interface ExperienciaProfesionalData {
   }>;
 }
 
-// Mock data
-const mockConvocatorias: Convocatoria[] = [
-  {
-    id: '1',
-    nombre: 'Convocatoria Extensionista Agrícola - Lima Norte 2026',
-    oficinaZonal: 'Lima',
-    oficinaCoordinacion: 'OC Lima Norte',
-    perfil: 'Extensionista',
-    fechaInicio: '10/01/2026',
-    fechaFin: '20/01/2026',
-    diasRestantes: 12,
-    estado: 'abierta',
-    pdfUrl: '#',
-  },
-  {
-    id: '2',
-    nombre: 'Convocatoria Técnico de Campo - Cusco',
-    oficinaZonal: 'Cusco',
-    oficinaCoordinacion: 'OC Cusco',
-    perfil: 'Técnico de Campo',
-    fechaInicio: '05/01/2026',
-    fechaFin: '10/01/2026',
-    diasRestantes: 2,
-    estado: 'abierta',
-    pdfUrl: '#',
-  },
-  {
-    id: '3',
-    nombre: 'Convocatoria Promotor Social - Ayacucho',
-    oficinaZonal: 'Ayacucho',
-    oficinaCoordinacion: 'OC Ayacucho',
-    perfil: 'Promotor',
-    fechaInicio: '01/01/2026',
-    fechaFin: '08/01/2026',
-    diasRestantes: 0,
-    estado: 'cerrada',
-    pdfUrl: '#',
-  },
-  {
-    id: '4',
-    nombre: 'Convocatoria Supervisor de Proyectos - Junín',
-    oficinaZonal: 'Junín',
-    oficinaCoordinacion: 'OC Junín',
-    perfil: 'Supervisor',
-    fechaInicio: '15/01/2026',
-    fechaFin: '30/01/2026',
-    diasRestantes: 22,
-    estado: 'proxima',
-    pdfUrl: '#',
-  },
-  {
-    id: '5',
-    nombre: 'Convocatoria Coordinador Regional - Huánuco',
-    oficinaZonal: 'Huánuco',
-    oficinaCoordinacion: 'OC Huánuco',
-    perfil: 'Coordinador',
-    fechaInicio: '08/01/2026',
-    fechaFin: '18/01/2026',
-    diasRestantes: 10,
-    estado: 'abierta',
-    pdfUrl: '#',
-  },
-  {
-    id: '6',
-    nombre: 'Convocatoria Extensionista Rural - Lima Sur',
-    oficinaZonal: 'Lima',
-    oficinaCoordinacion: 'OC Lima Sur',
-    perfil: 'Extensionista',
-    fechaInicio: '12/01/2026',
-    fechaFin: '25/01/2026',
-    diasRestantes: 17,
-    estado: 'abierta',
-    pdfUrl: '#',
-  },
-];
-
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -255,12 +181,15 @@ export default function App() {
   const [authView, setAuthView] = useState<'login' | 'register' | 'recovery'>(initialAuthView);
   const [activeSection, setActiveSection] = useState('hoja-vida');
   const [activeTab, setActiveTab] = useState('datos-personales');
-  const [convocatorias, setConvocatorias] = useState<Convocatoria[]>(mockConvocatorias);
-  const [filteredConvocatorias, setFilteredConvocatorias] = useState<Convocatoria[]>(mockConvocatorias);
+  const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
+  const [filteredConvocatorias, setFilteredConvocatorias] = useState<Convocatoria[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedConvocatoria, setSelectedConvocatoria] = useState<Convocatoria | null>(null); 
   const [hojaVidaEstado, setHojaVidaEstado] = useState<string>(''); 
   const [hojaVidaCompleta, setHojaVidaCompleta] = useState(false); // Cambiar a false para simular hoja de vida incompleta 
+  const [hojaVidaId, setHojaVidaId] = useState<number>(0);
+  const [postulaciones, setPostulaciones] = useState<PostulacionListItem[]>([]);
+  const [isPostulacionesLoading, setIsPostulacionesLoading] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [registroPopup, setRegistroPopup] = useState<string | null>(null);
   
@@ -338,6 +267,9 @@ export default function App() {
       if (section === 'postulaciones') {
         setAdminSection('registros');
         navigate('/admin/registros', { replace: true });
+      } else if (section === 'convocatorias' || section === 'perfiles') {
+        setAdminSection('servicios');
+        navigate('/admin/servicios', { replace: true });
       } else {
         setAdminSection(section);
       }
@@ -345,8 +277,11 @@ export default function App() {
       setActiveSection('hoja-vida');
     } else if (path.startsWith('/postulaciones')) {
       setActiveSection('postulaciones');
+    } else if (path.startsWith('/servicios')) { 
+      setActiveSection('convocatorias'); 
     } else if (path.startsWith('/perfiles') || path.startsWith('/convocatorias')) { 
       setActiveSection('convocatorias'); 
+      navigate('/servicios', { replace: true }); 
     } 
   }, [location.pathname, isAuthenticated, userType, navigate]); 
 
@@ -405,6 +340,7 @@ export default function App() {
     setAuthView('login');
     setActiveSection('hoja-vida');
     setPostulanteUser(null);
+    setHojaVidaId(0);
     navigate('/login', { replace: true });
   };
 
@@ -438,8 +374,14 @@ export default function App() {
   const mapConvocatoria = (item: any): Convocatoria => ({
     id: String(item.idConvocatoria ?? item.id ?? ''),
     nombre: item.nombre ?? '',
-    oficinaZonal: item.oficinaZonal ?? item.oficinaCoordinacion ?? '',
+    oficinaZonal: item.oficinaZonal ?? item.nombreOficinaZonal ?? '',
     oficinaCoordinacion: item.oficinaCoordinacion ?? '',
+    idOficinaZonal:
+      item.idOficinaZonal !== undefined && item.idOficinaZonal !== null
+        ? Number(item.idOficinaZonal)
+        : item.id_oficina_zonal !== undefined && item.id_oficina_zonal !== null
+        ? Number(item.id_oficina_zonal)
+        : undefined,
     perfil: item.perfil ?? '',
     fechaInicio: item.fechaInicio ?? '',
     fechaFin: item.fechaFin ?? '',
@@ -461,11 +403,35 @@ export default function App() {
     }
   };
 
+  const loadPostulaciones = async (): Promise<PostulacionListItem[]> => {
+    if (!postulanteUser?.idPersona) {
+      setPostulaciones([]);
+      return [];
+    }
+    setIsPostulacionesLoading(true);
+    try {
+      const data = await fetchPostulacionesByPersona(postulanteUser.idPersona);
+      setPostulaciones(data);
+      return data;
+    } catch {
+      setPostulaciones([]);
+      return [];
+    } finally {
+      setIsPostulacionesLoading(false);
+    }
+  };
+
   useEffect(() => { 
-    if (isAuthenticated && userType === 'postulante') { 
+    if (isAuthenticated && (userType === 'postulante' || userType === 'admin')) { 
       loadConvocatorias(); 
     } 
   }, [isAuthenticated, userType]); 
+
+  useEffect(() => {
+    if (isAuthenticated && userType === 'postulante') {
+      loadPostulaciones();
+    }
+  }, [isAuthenticated, userType, postulanteUser?.idPersona]);
 
   useEffect(() => { 
     const loadHojaVidaEstado = async () => { 
@@ -477,9 +443,11 @@ export default function App() {
         const estado = hvActual?.estado ?? ''; 
         setHojaVidaEstado(estado); 
         setHojaVidaCompleta((estado || '').toUpperCase() === 'COMPLETO'); 
+        setHojaVidaId(Number(hvActual?.idHojaVida ?? 0));
       } catch { 
         setHojaVidaEstado(''); 
         setHojaVidaCompleta(false); 
+        setHojaVidaId(0);
       } 
     }; 
     loadHojaVidaEstado(); 
@@ -504,7 +472,13 @@ export default function App() {
     await loadConvocatorias();
   };
 
-  const handlePostular = (convocatoria: Convocatoria) => {
+  const handlePostular = async (convocatoria: Convocatoria) => {
+    const data = await loadPostulaciones();
+    const bloqueo = getBloqueoConvocatoria(convocatoria, data);
+    if (bloqueo.blocked) {
+      alert(bloqueo.reason || 'No puedes registrarte en este servicio.');
+      return;
+    }
     setSelectedConvocatoria(convocatoria);
     
     // Si la hoja de vida está completa, mostrar modal de confirmación
@@ -527,7 +501,7 @@ export default function App() {
     // Cerrar modal de confirmación y cambiar a la sección de postulación 
     setShowConfirmacionModal(false); 
     setActiveSection('postulacion'); 
-    navigate('/perfiles'); 
+    navigate('/servicios'); 
   }; 
 
   const handleCancelarConfirmacion = () => {
@@ -535,13 +509,123 @@ export default function App() {
     setSelectedConvocatoria(null);
   };
 
-  const handleCompletarPostulacion = () => { 
-    // Lógica para completar el registro
-    setRegistroPopup('Registro completado.');
-    setActiveSection('convocatorias'); 
-    setSelectedConvocatoria(null); 
-    navigate('/perfiles'); 
+  const handleCompletarPostulacion = async () => { 
+    if (!selectedConvocatoria || !postulanteUser) { 
+      alert('No se encontró información de la postulación.'); 
+      return; 
+    } 
+    const data = await loadPostulaciones();
+    const bloqueo = getBloqueoConvocatoria(selectedConvocatoria, data);
+    if (bloqueo.blocked) {
+      alert(bloqueo.reason || 'No puedes registrarte en este servicio.');
+      return;
+    }
+    if (!hojaVidaId) { 
+      alert('No se encontró la hoja de vida.'); 
+      return; 
+    } 
+    const idConvocatoria = Number(selectedConvocatoria.id || 0); 
+    if (!idConvocatoria) { 
+      alert('No se encontró el servicio seleccionado.'); 
+      return; 
+    } 
+    try { 
+      const numeroPostulacion = await upsertPostulacion({ 
+        idPostulacion: 0, 
+        idPersona: postulanteUser.idPersona, 
+        idConvocatoria, 
+        idHojaVida: hojaVidaId, 
+        numeroPostulacion: '', 
+        estado: 'en-revision', 
+        observacion: '', 
+        usuarioAccion: postulanteUser.idUsuario, 
+      }); 
+      setRegistroPopup(
+        numeroPostulacion
+          ? `Registro completado. N° ${numeroPostulacion}.`
+          : 'Registro completado.',
+      );
+      loadPostulaciones();
+      setActiveSection('convocatorias'); 
+      setSelectedConvocatoria(null); 
+      navigate('/servicios'); 
+    } catch { 
+      alert('No se pudo completar el registro.'); 
+    } 
   }; 
+
+  const normalizeOzName = (value: string) => value.trim().toUpperCase();
+
+  const getConvocatoriaOzKey = (conv: Convocatoria) => {
+    if (conv.idOficinaZonal) return `id:${conv.idOficinaZonal}`;
+    const oficinaZonalName =
+      conv.oficinaZonal ||
+      (conv.oficinaCoordinacion
+        ? conv.oficinaCoordinacion.split('/')[0]?.trim() || ''
+        : '');
+    if (oficinaZonalName) return `name:${normalizeOzName(oficinaZonalName)}`;
+    return '';
+  };
+
+  const buildPostulacionesResumen = (items: PostulacionListItem[]) => {
+    const byOz = new Map<string, number>();
+    const ozSet = new Set<string>();
+    const byConvocatoria = new Set<string>();
+    items.forEach((item) => {
+      const ozIdKey = item.idOficinaZonal ? `id:${item.idOficinaZonal}` : '';
+      const ozNameKey = item.oficinaZonal ? `name:${normalizeOzName(item.oficinaZonal)}` : '';
+      const canonicalKey = ozIdKey || ozNameKey;
+
+      if (ozIdKey) {
+        byOz.set(ozIdKey, (byOz.get(ozIdKey) || 0) + 1);
+      }
+      if (ozNameKey) {
+        byOz.set(ozNameKey, (byOz.get(ozNameKey) || 0) + 1);
+      }
+      if (canonicalKey) {
+        ozSet.add(canonicalKey);
+      }
+      if (item.idConvocatoria) {
+        byConvocatoria.add(String(item.idConvocatoria));
+      }
+    });
+    return { byOz, ozSet, byConvocatoria };
+  };
+
+  const postulacionesResumen = buildPostulacionesResumen(postulaciones);
+
+  if (typeof window !== 'undefined') {
+    (window as any).postulacionesResumen = {
+      byOz: Array.from(postulacionesResumen.byOz.entries()),
+      ozSet: Array.from(postulacionesResumen.ozSet.values()),
+      byConvocatoria: Array.from(postulacionesResumen.byConvocatoria.values()),
+    };
+  }
+
+  const getBloqueoConvocatoria = (
+    conv: Convocatoria,
+    items: PostulacionListItem[] = postulaciones,
+  ) => {
+    const resumen = buildPostulacionesResumen(items);
+    const convId = String(conv.id || '');
+    if (resumen.byConvocatoria.has(convId)) {
+      return { blocked: true, reason: 'Ya estás registrado en este servicio.' };
+    }
+    const ozKey = getConvocatoriaOzKey(conv);
+    if (!ozKey) {
+      return { blocked: false, reason: '' };
+    }
+    const count = resumen.byOz.get(ozKey) || 0;
+    const ozUsed = resumen.ozSet.has(ozKey);
+    const ozCount = resumen.ozSet.size;
+    if (count >= 2) {
+      return { blocked: true, reason: 'Ya tienes 2 servicios en esta Oficina Zonal.' };
+    }
+    if (!ozUsed && ozCount >= 2) {
+      return { blocked: true, reason: 'Ya estás asociado a 2 Oficinas Zonales.' };
+    }
+    return { blocked: false, reason: '' };
+  };
 
   const handleRealizarCambios = () => {
     // Volver a hoja de vida
@@ -554,7 +638,7 @@ export default function App() {
     // Volver a convocatorias 
     setActiveSection('convocatorias'); 
     setSelectedConvocatoria(null); 
-    navigate('/perfiles'); 
+    navigate('/servicios'); 
   }; 
 
   const handleVerDetallePostulacion = (postulacion: any) => {
@@ -599,7 +683,7 @@ export default function App() {
                 </div>
                 <h3 className="text-xl font-bold mb-2 text-gray-800">Usuario</h3>
                 <p className="text-sm text-gray-600">
-            Accede para registrar tu hoja de vida y postular a perfiles
+                  Accede para registrar tu hoja de vida
                 </p>
               </button>
 
@@ -677,9 +761,10 @@ export default function App() {
           {adminSection === 'registros' && (
             <GestionPostulaciones 
               convocatorias={convocatorias}
+              adminUserId={adminUserId}
             />
           )}
-          {adminSection === 'convocatorias' && (
+          {adminSection === 'servicios' && (
             <GestionConvocatorias adminUserId={adminUserId} />
           )}
           {adminSection === 'plantillas' && <PlantillasCorreo />}
@@ -698,7 +783,7 @@ export default function App() {
         onNavigate={(section) => { 
           setActiveSection(section); 
           if (section === 'convocatorias') { 
-            navigate('/perfiles'); 
+            navigate('/servicios'); 
           } else { 
             navigate('/hojaVida'); 
           } 
@@ -717,10 +802,10 @@ export default function App() {
             <div className="mb-8">
               <h1 className="text-3xl font-bold flex items-center gap-3" style={{ color: '#04a25c' }}>
                 <Briefcase className="w-8 h-8" />
-                Perfiles Disponibles 
+                Servicios Disponibles 
               </h1> 
               <p className="mt-2 font-bold" style={{ color: '#108cc9' }}> 
-                Explora y regístrate solo a 2 perfiles disponibles como máximo 
+                Explora y regístrate hasta en 2 servicios por cada Oficina Zonal. Puedes asociarte como máximo a 2 Oficinas Zonales.
               </p> 
             </div> 
 
@@ -732,6 +817,7 @@ export default function App() {
               convocatorias={filteredConvocatorias} 
               onPostular={handlePostular} 
               hojaVidaCompleta={hojaVidaCompleta} 
+              getRegistroBloqueo={getBloqueoConvocatoria}
             /> 
           </div>
         ) : activeSection === 'hoja-vida' ? (

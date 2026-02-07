@@ -31,6 +31,7 @@ export interface HojaVidaDatos {
   nacionalidad: string;
   telefonoCelular: string;
   correo: string;
+  correoSecundario?: string;
   ruc: string;
   cuentaBn: string;
   cciBn: string;
@@ -54,6 +55,7 @@ export interface HojaVidaDatosPayload {
   nacionalidad: string;
   telefonoCelular: string;
   correo: string;
+  correoSecundario: string;
   ruc: string;
   cuentaBn: string;
   cciBn: string;

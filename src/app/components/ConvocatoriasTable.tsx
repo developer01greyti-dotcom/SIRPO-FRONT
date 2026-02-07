@@ -21,6 +21,8 @@ interface Convocatoria {
   id: string;
   nombre: string;
   oficinaCoordinacion: string;
+  oficinaZonal?: string;
+  idOficinaZonal?: number;
   perfil: string;
   fechaInicio: string;
   fechaFin: string;
@@ -35,9 +37,15 @@ interface ConvocatoriasTableProps {
   convocatorias: Convocatoria[]; 
   onPostular: (convocatoria: Convocatoria) => void; 
   hojaVidaCompleta?: boolean; 
+  getRegistroBloqueo?: (convocatoria: Convocatoria) => { blocked: boolean; reason?: string };
 } 
 
-export function ConvocatoriasTable({ convocatorias, onPostular, hojaVidaCompleta = false }: ConvocatoriasTableProps) { 
+export function ConvocatoriasTable({
+  convocatorias,
+  onPostular,
+  hojaVidaCompleta = false,
+  getRegistroBloqueo,
+}: ConvocatoriasTableProps) { 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case 'abierta':
@@ -119,9 +127,9 @@ export function ConvocatoriasTable({ convocatorias, onPostular, hojaVidaCompleta
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold" style={{ color: '#04a25c' }}>Perfiles Disponibles</h2>
+            <h2 className="text-lg font-bold" style={{ color: '#04a25c' }}>Servicios Disponibles</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Se encontraron {convocatorias.length} {convocatorias.length === 1 ? 'perfil' : 'perfiles'}
+              Se encontraron {convocatorias.length} {convocatorias.length === 1 ? 'servicio' : 'servicios'}
             </p>
           </div>
         </div>
@@ -131,22 +139,21 @@ export function ConvocatoriasTable({ convocatorias, onPostular, hojaVidaCompleta
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
-                <TableHead className="font-semibold">Perfil</TableHead>
+                <TableHead className="font-semibold">Servicio</TableHead>
                 <TableHead className="font-semibold">Oficina de Coordinación</TableHead>
                 <TableHead className="font-semibold">Categoría</TableHead>
-                <TableHead className="font-semibold">Fecha Inicio</TableHead>
-                <TableHead className="font-semibold">Fecha Fin</TableHead>
+                <TableHead className="font-semibold">Perfil del servicio</TableHead>
                 <TableHead className="font-semibold text-center">Acciones</TableHead> 
               </TableRow>
             </TableHeader>
             <TableBody>
               {convocatorias.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12"> 
+                  <TableCell colSpan={5} className="text-center py-12"> 
                     <div className="flex flex-col items-center gap-3">
                       <AlertCircle className="w-12 h-12 text-gray-400" />
                       <div>
-                        <p className="text-gray-900 font-medium">No se encontraron perfiles</p>
+                        <p className="text-gray-900 font-medium">No se encontraron servicios</p>
                         <p className="text-sm text-gray-500 mt-1">Intenta ajustar los filtros de búsqueda</p>
                       </div>
                     </div>
@@ -155,6 +162,8 @@ export function ConvocatoriasTable({ convocatorias, onPostular, hojaVidaCompleta
               ) : (
                 convocatorias.map((conv) => (
                   <TableRow key={conv.id} className="hover:bg-gray-50">
+                    {/** bloqueo por reglas de registro */}
+                    {/** se calcula por convocatoria */}
                     <TableCell className="font-medium">{conv.nombre}</TableCell>
                     <TableCell>{conv.oficinaCoordinacion}</TableCell>
                     <TableCell>
@@ -162,58 +171,75 @@ export function ConvocatoriasTable({ convocatorias, onPostular, hojaVidaCompleta
                         {conv.perfil}
                       </span>
                     </TableCell>
-                    <TableCell className="text-sm text-gray-600">{conv.fechaInicio}</TableCell>
-                    <TableCell className="text-sm text-gray-600">{conv.fechaFin}</TableCell>
+                    <TableCell>
+                      {(conv.pdfUrl || conv.archivoGuid) ? (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleVerBases(conv.pdfUrl, conv.archivoGuid)} 
+                          className="h-8 w-8 p-0" 
+                          title="Ver perfil del servicio" 
+                        > 
+                          <FileDown className="w-4 h-4" /> 
+                        </Button> 
+                      ) : (
+                        <span className="text-sm text-gray-500">-</span>
+                      )}
+                    </TableCell>
                     <TableCell> 
                       <div className="flex items-center justify-center gap-2">
-                        {(conv.pdfUrl || conv.archivoGuid) && ( 
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleVerBases(conv.pdfUrl, conv.archivoGuid)} 
-                            className="h-8 w-8 p-0" 
-                            title="Ver bases del perfil" 
-                          > 
-                            <FileDown className="w-4 h-4" /> 
-                          </Button> 
-                        )} 
+                        {(() => {
+                          const bloqueo = getRegistroBloqueo ? getRegistroBloqueo(conv) : { blocked: false, reason: '' };
+                          const registroHabilitado =
+                            conv.estadoId === 1 &&
+                            isWithinRange(conv.fechaInicio, conv.fechaFin) &&
+                            hojaVidaCompleta &&
+                            !bloqueo.blocked;
 
-                        {conv.estadoId === 1 && isWithinRange(conv.fechaInicio, conv.fechaFin) && hojaVidaCompleta ? ( 
-                          <Button 
-                            size="sm" 
-                            onClick={() => onPostular(conv)} 
-                            className="h-8 px-3 bg-green-600 hover:bg-green-700 gap-2" 
-                          > 
-                            <Send className="w-3.5 h-3.5" /> 
-                            Registrarse  
-                          </Button>  
-                        ) : ( 
-                          <TooltipProvider> 
-                            <Tooltip> 
-                              <TooltipTrigger asChild> 
-                                <div className="inline-block"> 
-                                  <Button 
-                                    size="sm" 
-                                    disabled 
-                                    className="h-8 px-3 gap-2" 
-                                  > 
-                                    <Send className="w-3.5 h-3.5" /> 
-                                    Registrarse 
-                                  </Button> 
-                                </div> 
-                              </TooltipTrigger> 
-                              <TooltipContent> 
-                                <p> 
-                                  {!hojaVidaCompleta
-                                    ? 'Completa tu Hoja de Vida para registrarte'
-                                    : conv.estadoId !== 1
-                                    ? 'Este perfil está inactivo'
-                                    : 'Este perfil está fuera de vigencia'} 
-                                </p> 
-                              </TooltipContent> 
-                            </Tooltip> 
-                          </TooltipProvider> 
-                        )} 
+                          if (registroHabilitado) {
+                            return (
+                              <Button 
+                                size="sm" 
+                                onClick={() => onPostular(conv)} 
+                                className="h-8 px-3 bg-green-600 hover:bg-green-700 gap-2" 
+                              > 
+                                <Send className="w-3.5 h-3.5" /> 
+                                Registrarse  
+                              </Button>
+                            );
+                          }
+
+                          const mensaje =
+                            bloqueo.blocked && bloqueo.reason
+                              ? bloqueo.reason
+                              : !hojaVidaCompleta
+                              ? 'Completa tu Hoja de Vida para registrarte'
+                              : conv.estadoId !== 1
+                              ? 'Este servicio está inactivo'
+                              : 'Este servicio está fuera de vigencia';
+
+                          return (
+                            <TooltipProvider> 
+                              <Tooltip> 
+                                <TooltipTrigger asChild> 
+                                  <div className="inline-block"> 
+                                    <Button 
+                                      size="sm" 
+                                      disabled 
+                                      className="h-8 px-3 gap-2" 
+                                    > 
+                                      <Send className="w-3.5 h-3.5" /> 
+                                      Registrarse 
+                                    </Button> 
+                                  </div> 
+                                </TooltipTrigger> 
+                                <TooltipContent> 
+                                  <p>{mensaje}</p> 
+                                </TooltipContent> 
+                              </Tooltip> 
+                            </TooltipProvider>
+                          );
+                        })()}
                       </div>
                     </TableCell>
                   </TableRow>

@@ -44,7 +44,7 @@ export function Sidebar({
     },
     {
       id: 'convocatorias',
-      label: 'Perfiles Disponibles',
+      label: 'Servicios Disponibles',
       icon: Briefcase,
     },
   ];

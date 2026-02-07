@@ -37,7 +37,7 @@ export function ConfirmacionPostulacion({
             <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-blue-900">
-                ¿Deseas registrarte a este perfil?
+                ¿Deseas registrarte a este servicio?
               </p>
               <p className="text-xs text-blue-700 mt-1">
                 Se mostrará la vista previa de tu hoja de vida antes de confirmar
@@ -46,16 +46,16 @@ export function ConfirmacionPostulacion({
           </div>
 
           <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Perfil</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Servicio</p>
             <p className="text-sm font-medium text-gray-900">{convocatoriaNombre}</p>
           </div>
 
           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
             <p className="text-xs font-semibold text-yellow-800 mb-2">Importante:</p>
             <ul className="text-xs text-yellow-700 space-y-1">
-              <li>• Podrás revisar tu hoja de vida antes de registrarte al perfil</li>
+              <li>• Podrás revisar tu hoja de vida antes de registrarte al servicio</li>
               <li>• Si necesitas hacer cambios, podrás regresar a editar tu información</li>
-              <li>• Recuerda que solo puedes registrarte a dos perfiles vigentes</li>
+              <li>• Recuerda que solo puedes registrarte a 2 servicios por cada Oficina Zonal</li>
             </ul>
           </div>
         </div>

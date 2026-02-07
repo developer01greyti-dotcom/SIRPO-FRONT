@@ -1,4 +1,4 @@
-﻿import { Search, X, Calendar } from 'lucide-react';
+﻿import { Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -33,8 +33,6 @@ export function FilterCard({ onSearch, onClear }: FilterCardProps) {
     oficinaCoordinacion: '',
     perfil: '',
     estado: '',
-    fechaInicio: '',
-    fechaFin: '',
     busqueda: '',
   });
 
@@ -105,8 +103,6 @@ export function FilterCard({ onSearch, onClear }: FilterCardProps) {
       oficinaCoordinacion: '',
       perfil: '',
       estado: '',
-      fechaInicio: '',
-      fechaFin: '',
       busqueda: '',
     });
     setOficinaQuery('');
@@ -121,7 +117,7 @@ export function FilterCard({ onSearch, onClear }: FilterCardProps) {
           <div className="flex items-center justify-between gap-4"> 
             <div> 
               <h2 className="text-lg font-bold" style={{ color: '#04a25c' }}>Filtros de Búsqueda</h2> 
-              <p className="text-sm text-gray-500 mt-1">Refina tu búsqueda de perfiles</p>  
+              <p className="text-sm text-gray-500 mt-1">Refina tu búsqueda de servicios</p>  
             </div> 
             <Button 
               type="button" 
@@ -135,7 +131,7 @@ export function FilterCard({ onSearch, onClear }: FilterCardProps) {
 
           {showFilters && (  
           <> 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">  
+          <div className="grid grid-cols-1 md:grid-cols-8 gap-4">  
             <div className="space-y-2 md:col-span-4">  
               <Label htmlFor="oficinaCoordinacion">Oficina de Coordinación</Label>
               <Select
@@ -234,46 +230,16 @@ export function FilterCard({ onSearch, onClear }: FilterCardProps) {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2 md:col-span-2"> 
-              <Label htmlFor="fechaInicio">Fecha Inicio</Label> 
-              <div className="relative"> 
-                <Input 
-                  type="date"
-                  id="fechaInicio"
-                  name="fechaInicio"
-                  className="pl-10"
-                  value={filters.fechaInicio}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, fechaInicio: e.target.value }))}
-                />
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-
-            <div className="space-y-2 md:col-span-2"> 
-              <Label htmlFor="fechaFin">Fecha Fin</Label> 
-              <div className="relative"> 
-                <Input 
-                  type="date"
-                  id="fechaFin"
-                  name="fechaFin"
-                  className="pl-10"
-                  value={filters.fechaFin}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, fechaFin: e.target.value }))}
-                />
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
           </div>
 
           <div className="space-y-2"> 
-            <Label htmlFor="busqueda">Perfil</Label> 
+            <Label htmlFor="busqueda">Servicio</Label> 
             <div className="relative"> 
               <Input 
                 type="text" 
                 id="busqueda" 
                 name="busqueda" 
-                placeholder="Buscar por título de perfil..." 
+                placeholder="Buscar por título de servicio..." 
                 className="pl-10" 
                 value={filters.busqueda}
                 onChange={(e) => setFilters((prev) => ({ ...prev, busqueda: e.target.value }))}

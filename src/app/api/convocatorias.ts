@@ -14,6 +14,8 @@ export interface ConvocatoriaListItem {
   idConvocatoria?: number | string;
   nombre: string;
   oficinaCoordinacion: string;
+  oficinaZonal?: string;
+  idOficinaZonal?: number | string;
   perfil: string;
   fechaInicio: string;
   fechaFin: string;
@@ -42,9 +44,6 @@ export interface ConvocatoriaUpsertPayload {
   fechaFin: string;
   requisitosMinimos: string;
   funcionesPrincipales: string;
-  salarioMin: number;
-  salarioMax: number;
-  estado: string;
   idArchivoBases: number;
   usuarioAccion: number;
 }
@@ -72,6 +71,8 @@ export const fetchConvocatoriasList = async (
     idConvocatoria: item.idConvocatoria ?? item.id_convocatoria ?? '',
     nombre: item.nombre,
     oficinaCoordinacion: item.oficinaCoordinacion ?? '',
+    oficinaZonal: item.oficinaZonal ?? item.nombreOficinaZonal ?? item.nombre_zonal ?? '',
+    idOficinaZonal: item.idOficinaZonal ?? item.id_oficina_zonal ?? item.idZonal ?? '',
     perfil: item.perfil ?? '',
     fechaInicio: item.fechaInicio ?? '',
     fechaFin: item.fechaFin ?? '',
@@ -107,9 +108,6 @@ export const upsertConvocatoria = async (
         fechaFin: payload.fechaFin,
         clob1: payload.requisitosMinimos,
         clob2: payload.funcionesPrincipales,
-        salarioMin: payload.salarioMin,
-        salarioMax: payload.salarioMax,
-        estado: payload.estado,
         idArchivoBases: payload.idArchivoBases,
         usuarioAccion: payload.usuarioAccion,
       },

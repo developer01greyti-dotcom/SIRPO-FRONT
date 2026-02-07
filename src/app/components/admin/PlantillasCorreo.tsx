@@ -14,7 +14,7 @@ Bienvenido al Sistema de Registro de Profesionales y/o Técnicos para Trabajo de
 
 Tu cuenta ha sido creada exitosamente. Ahora puedes:
 - Completar tu hoja de vida
-- Registrarte a perfiles laborales
+- Registrarte a servicios
 - Hacer seguimiento a tus registros
 
 Para comenzar, ingresa al sistema con las credenciales que registraste.
@@ -26,7 +26,7 @@ Equipo DEVIDA`,
       asunto: 'Confirmación de Registro - {{convocatoria}}',
       contenido: `Estimado/a {{nombre}},
 
-Hemos recibido tu registro al perfil:
+Hemos recibido tu registro al servicio:
 {{convocatoria}}
 
 Número de registro: {{numeroPostulacion}}
@@ -45,7 +45,7 @@ Equipo DEVIDA`,
 
 Te informamos que el estado de tu registro ha sido actualizado:
 
-Perfil: {{convocatoria}}
+Servicio: {{convocatoria}}
 Nuevo estado: {{nuevoEstado}}
 Fecha de actualización: {{fecha}}
 
@@ -60,7 +60,7 @@ Equipo DEVIDA`,
       asunto: 'Resultado Final - {{convocatoria}}',
       contenido: `Estimado/a {{nombre}},
 
-Te informamos el resultado final de tu registro a:
+Te informamos el resultado final de tu registro al servicio:
 {{convocatoria}}
 
 Estado: {{estadoFinal}}
@@ -108,7 +108,7 @@ Equipo DEVIDA`,
     return {
       asunto: editedAsunto
         .replace('{{nombre}}', 'Juan Pérez')
-        .replace('{{convocatoria}}', 'Perfil Extensionista Agrícola - Lima Norte 2026')
+        .replace('{{convocatoria}}', 'Servicio Extensionista Agrícola - Lima Norte 2026')
         .replace('{{numeroPostulacion}}', 'POST-2026-001')
         .replace('{{fechaPostulacion}}', '11/01/2026')
         .replace('{{nuevoEstado}}', 'PRESELECCIONADO')
@@ -116,7 +116,7 @@ Equipo DEVIDA`,
         .replace('{{estadoFinal}}', 'FINALISTA'),
       contenido: editedContenido
         .replace(/{{nombre}}/g, 'Juan Pérez')
-        .replace(/{{convocatoria}}/g, 'Perfil Extensionista Agrícola - Lima Norte 2026')
+        .replace(/{{convocatoria}}/g, 'Servicio Extensionista Agrícola - Lima Norte 2026')
         .replace(/{{numeroPostulacion}}/g, 'POST-2026-001')
         .replace(/{{fechaPostulacion}}/g, '11/01/2026')
         .replace(/{{nuevoEstado}}/g, 'PRESELECCIONADO')
@@ -187,7 +187,7 @@ Equipo DEVIDA`,
                 <p className="text-xs font-semibold text-blue-900 mb-2">Variables disponibles:</p>
                 <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
                   <div>• {'{'}{'nombre'}{'}'} - Nombre del usuario</div>
-                  <div>• {'{'}{'convocatoria'}{'}'} - Nombre del perfil</div>
+                  <div>• {'{'}{'convocatoria'}{'}'} - Nombre del servicio</div>
                   <div>• {'{'}{'numeroPostulacion'}{'}'} - Número de registro</div>
                   <div>• {'{'}{'fechaPostulacion'}{'}'} - Fecha de registro</div>
                   <div>• {'{'}{'nuevoEstado'}{'}'} - Nuevo estado</div>

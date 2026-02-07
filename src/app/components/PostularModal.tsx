@@ -38,7 +38,7 @@ export function PostularModal({
               </div>
             </div>
             <DialogDescription>
-              Estás a punto de registrarte al perfil: {nombreConvocatoria}
+              Estás a punto de registrarte al servicio: {nombreConvocatoria}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -77,7 +77,7 @@ export function PostularModal({
         </DialogHeader>
         <div className="py-4 space-y-4">
           <p className="text-gray-700">
-            Perfil: <span className="font-semibold text-gray-900">{nombreConvocatoria}</span>
+            Servicio: <span className="font-semibold text-gray-900">{nombreConvocatoria}</span>
           </p>
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
             <p className="text-sm text-blue-900 font-medium mb-2">

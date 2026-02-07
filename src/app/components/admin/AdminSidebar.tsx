@@ -21,7 +21,7 @@ export function AdminSidebar({
 
   const menuItems = [
     { id: 'registros', icon: Users, label: 'Registros', roles: ['gestor', 'superadmin'] },
-    { id: 'convocatorias', icon: Briefcase, label: 'Perfiles', roles: ['gestor', 'superadmin'] },
+    { id: 'servicios', icon: Briefcase, label: 'Servicios', roles: ['gestor', 'superadmin'] },
     { id: 'plantillas', icon: Mail, label: 'Plantillas de Correo', roles: ['gestor', 'superadmin'] },
     { id: 'usuarios', icon: Shield, label: 'Gestión de Usuarios', roles: ['superadmin'] },
   ];

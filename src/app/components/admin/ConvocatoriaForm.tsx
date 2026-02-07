@@ -339,16 +339,13 @@ export function ConvocatoriaForm({
         fechaFin: formData.fechaFin,
         requisitosMinimos: formData.requisitosMinimos || '',
         funcionesPrincipales: formData.funcionesPrincipales || '',
-        salarioMin: Number(formData.salarioMin || 0),
-        salarioMax: Number(formData.salarioMax || 0),
-        estado: formData.estado || '',
         idArchivoBases: formData.idArchivoBases ? 1 : 0,
         usuarioAccion,
       };
 
       const idConvocatoria = await upsertConvocatoria(payload);
       if (!idConvocatoria) {
-        setError('No se pudo guardar el Perfil.');
+        setError('No se pudo guardar el Servicio.');
         return;
       }
 
@@ -368,13 +365,13 @@ export function ConvocatoriaForm({
           usuarioAccion,
         });
         if (!ok) {
-          setError('El Perfil se guardó, pero no se pudo subir el archivo.');
+          setError('El Servicio se guardó, pero no se pudo subir el archivo.');
         }
       }
 
       onGuardar();
     } catch (err) {
-      setError('No se pudo guardar el Perfil.');
+      setError('No se pudo guardar el Servicio.');
     } finally {
       setIsSubmitting(false);
     }
@@ -385,12 +382,12 @@ export function ConvocatoriaForm({
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold" style={{ color: '#04a25c' }}>
-            {isEditing ? 'Editar Perfil' : 'Nuevo Perfil'}
+            {isEditing ? 'Editar Servicio' : 'Nuevo Servicio'}
           </h1>
           <p className="mt-2 font-bold" style={{ color: '#108cc9' }}>
             {isEditing
-              ? 'Actualizar información del Perfil'
-              : 'Crear un nuevo Perfil laboral'}
+              ? 'Actualizar información del Servicio'
+              : 'Crear un nuevo Servicio laboral'}
           </p>
         </div>
         <Button variant="outline" onClick={onCancelar} className="gap-2">
@@ -414,7 +411,7 @@ export function ConvocatoriaForm({
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700">
-                Título del Perfil *
+                Título del Servicio *
               </label>
               <input
                 type="text"
@@ -428,7 +425,7 @@ export function ConvocatoriaForm({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> 
               <div className="space-y-2"> 
-                <label className="block text-sm font-semibold text-gray-700">Categoría de Perfil *</label> 
+                <label className="block text-sm font-semibold text-gray-700">Categoría de Servicio *</label> 
                 <select 
                   value={formData.idPerfil} 
                   onChange={(e) => setFormData({ ...formData, idPerfil: e.target.value })} 
@@ -569,7 +566,7 @@ export function ConvocatoriaForm({
 
         <Card className="p-6">
           <h3 className="text-lg font-bold mb-4" style={{ color: '#04a25c' }}>
-            Período del Perfil
+            Período del Servicio
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -599,7 +596,7 @@ export function ConvocatoriaForm({
 
         <Card className="p-6">
           <h3 className="text-lg font-bold mb-4" style={{ color: '#04a25c' }}>
-            Detalle del Perfil
+            Detalle del Servicio
           </h3>
 
           <div className="space-y-4">
@@ -624,7 +621,7 @@ export function ConvocatoriaForm({
 
         <Card className="p-6">
           <h3 className="text-lg font-bold mb-4" style={{ color: '#04a25c' }}>
-            Bases del Perfil
+            Bases del Servicio
           </h3>
 
           <div className="space-y-4">
@@ -650,7 +647,7 @@ export function ConvocatoriaForm({
                 <div className="flex-1">
                   <p className="text-sm font-medium text-green-800">Archivo cargado correctamente</p>
                   <p className="text-xs text-green-600">
-                    {pdfFile?.name || 'bases_perfil.pdf'}
+                    {pdfFile?.name || 'bases_servicio.pdf'}
                   </p>
                 </div>
                 {(formData.pdfUrl || formData.archivoGuid) && (
@@ -675,7 +672,7 @@ export function ConvocatoriaForm({
           </Button>
           <Button type="submit" className="bg-green-600 hover:bg-green-700 gap-2" disabled={isSubmitting}>
             <Save className="w-4 h-4" />
-            {isSubmitting ? 'Guardando...' : isEditing ? 'Actualizar Perfil' : 'Crear Perfil'}
+            {isSubmitting ? 'Guardando...' : isEditing ? 'Actualizar Servicio' : 'Crear Servicio'}
           </Button>
         </div>
       </form>

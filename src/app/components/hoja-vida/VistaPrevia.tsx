@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { User, MapPin, FileText, GraduationCap, Briefcase, Download, Phone, Mail, Calendar, Building2, Award, Home, CreditCard, Shield, CheckCircle2 } from 'lucide-react';
+import { User, MapPin, FileText, GraduationCap, Briefcase, Download, Eye, Phone, Mail, Calendar, Building2, Award, Home, CreditCard, Shield, CheckCircle2 } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
@@ -76,6 +76,7 @@ interface DatosPersonalesData {
   fechaNacimiento: string;
   nacionalidad: string;
   correo: string;
+  correoSecundario?: string;
   ruc: string;
   celular: string;
   cuentaBn: string;
@@ -139,6 +140,10 @@ export function VistaPrevia({
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.click();
+  };
+
+  const previewFile = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const formatFecha = (fecha: string) => {
@@ -220,6 +225,7 @@ export function VistaPrevia({
             fechaNacimiento: datos.fechaNacimiento || '',
             nacionalidad: datos.nacionalidad || '',
             correo: datos.correo || '',
+            correoSecundario: datos.correoSecundario || '',
             ruc: datos.ruc || '',
             celular: datos.telefonoCelular || '',
             cuentaBn: datos.cuentaBn || '',
@@ -349,6 +355,7 @@ export function VistaPrevia({
     fechaNacimiento: '',
     nacionalidad: '',
     correo: '',
+    correoSecundario: '',
     ruc: '',
     celular: '',
     cuentaBn: '',
@@ -517,8 +524,14 @@ export function VistaPrevia({
                 <p className="text-sm font-medium text-gray-900">{displayValue(datosPersonales.celular)}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-gray-500">Correo Electrónico</p>
+                <p className="text-xs text-gray-500">Correo electrónico principal</p>
                 <p className="text-sm font-medium text-gray-900">{displayValue(datosPersonales.correo)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">Correo electrónico secundario</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {displayValue(datosPersonales.correoSecundario)}
+                </p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-gray-500">RUC</p>
@@ -656,6 +669,14 @@ export function VistaPrevia({
                         </div>
                         <button
                           type="button"
+                          onClick={() => previewFile(buildFileUrl(formacion.documento))}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors print:hidden"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Ver
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => downloadFile(buildFileUrl(formacion.documento), `formacion_${formacion.id}`)}
                           className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden"
                         >
@@ -756,6 +777,14 @@ export function VistaPrevia({
                           <FileText className="w-3 h-3" />
                           Documento adjuntado
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => previewFile(buildFileUrl(curso.documento))}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors print:hidden"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Ver
+                        </button>
                         <button
                           type="button"
                           onClick={() => downloadFile(buildFileUrl(curso.documento), `curso_${curso.id}`)}
@@ -862,6 +891,14 @@ export function VistaPrevia({
                         </div>
                         <button
                           type="button"
+                          onClick={() => previewFile(exp.certificadoPreview)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors print:hidden"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Ver
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => downloadFile(exp.certificadoPreview, `experiencia_${exp.id}`)}
                           className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden"
                         >
@@ -915,14 +952,24 @@ export function VistaPrevia({
                           Documento adjuntado
                         </div>
                         {decl.archivoGuid && (
-                          <button
-                            type="button"
-                            onClick={() => downloadFile(buildFileUrl(decl.archivoGuid), `declaracion_${decl.id}`)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            Descargar
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => previewFile(buildFileUrl(decl.archivoGuid))}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors print:hidden"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              Ver
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadFile(buildFileUrl(decl.archivoGuid), `declaracion_${decl.id}`)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Descargar
+                            </button>
+                          </>
                         )}
                       </div>
                     )}

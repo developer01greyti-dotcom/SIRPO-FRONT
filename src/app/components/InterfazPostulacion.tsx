@@ -106,7 +106,7 @@ export function InterfazPostulacion({
           <div className="flex-1">
             <h1 className="text-3xl font-bold flex items-center gap-3" style={{ color: '#04a25c' }}>
               <Send className="w-8 h-8" />
-              Registro del Perfil
+              Registro del Servicio
             </h1>
             <p className="mt-2 font-bold" style={{ color: '#108cc9' }}>
               Revisa tu información y completa tu registro
@@ -123,7 +123,7 @@ export function InterfazPostulacion({
         </div>
       </div>
 
-      {/* Información del Perfil */}
+      {/* Información del Servicio */}
       <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
         <div className="p-6">
           <div className="flex items-start justify-between">

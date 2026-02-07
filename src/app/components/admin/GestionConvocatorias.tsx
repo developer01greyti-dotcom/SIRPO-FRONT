@@ -74,7 +74,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
       setConvocatorias(data);
     } catch (error) {
       setConvocatorias([]);
-      setLoadError("No se pudo cargar el listado de perfiles.");
+      setLoadError("No se pudo cargar el listado de servicios.");
     } finally {
       setIsLoading(false);
     }
@@ -178,13 +178,13 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
     try {
       const ok = await deleteConvocatoria(idConvocatoria, adminUserId);
       if (!ok) {
-        alert("No se pudo eliminar el perfil.");
+        alert("No se pudo eliminar el servicio.");
         return;
       }
       await loadConvocatorias();
       setConfirmState({ open: false, convocatoria: null });
     } catch (error) {
-      alert("No se pudo eliminar el perfil.");
+      alert("No se pudo eliminar el servicio.");
     }
   };
 
@@ -252,15 +252,15 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3" style={{ color: "#04a25c" }}>
             <Briefcase className="w-8 h-8" />
-            Gestión de Perfiles
+            Gestión de Servicios
           </h1>
           <p className="mt-2 font-bold" style={{ color: "#108cc9" }}>
-            Administrar perfiles laborales de DEVIDA
+            Administrar servicios laborales de DEVIDA
           </p>
         </div>
         <Button onClick={handleNuevaConvocatoria} className="bg-green-600 hover:bg-green-700 gap-2">
           <Plus className="w-4 h-4" />
-          Nuevo Perfil
+          Nuevo Servicio
         </Button>
       </div>
 
@@ -268,7 +268,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold" style={{ color: "#04a25c" }}>
-              Listado de Perfiles
+              Listado de Servicios
             </h2>
             <div className="flex items-center gap-4">
               <Button
@@ -279,7 +279,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
                 {showFilters ? "Ocultar filtro de búsqueda" : "Mostrar filtro de búsqueda"} 
               </Button>
               <p className="text-sm text-gray-500">
-                {convocatorias.length} {convocatorias.length === 1 ? "perfil" : "perfiles"}
+                {convocatorias.length} {convocatorias.length === 1 ? "servicio" : "servicios"}
               </p>
             </div>
           </div>
@@ -366,7 +366,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
               </div>
 
               <div className="space-y-2"> 
-                <label className="block text-sm font-semibold text-gray-700">Categoría de Perfil</label>
+                <label className="block text-sm font-semibold text-gray-700">Categoría de Servicio</label>
                 <select
                   value={filters.perfil}
                   onChange={(e) => setFilters((prev) => ({ ...prev, perfil: e.target.value }))}
@@ -442,7 +442,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50"> 
-                  <TableHead className="font-semibold">Perfil</TableHead> 
+                  <TableHead className="font-semibold">Servicio</TableHead> 
                   <TableHead className="font-semibold">Categoría</TableHead> 
                   <TableHead className="font-semibold">Oficina de Coordinación</TableHead> 
                   <TableHead className="font-semibold">Fecha Inicio</TableHead> 
@@ -455,7 +455,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-sm text-gray-500 py-6">
-                      Cargando perfiles...
+                      Cargando servicios...
                     </TableCell>
                   </TableRow>
                 ) : loadError ? (
@@ -467,7 +467,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
                 ) : convocatorias.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-sm text-gray-500 py-6">
-                      No se encontraron perfiles.
+                      No se encontraron servicios.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -540,8 +540,8 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
             <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
             <AlertDialogDescription>
               {confirmState.convocatoria
-                ? `¿Está seguro de eliminar el perfil "${confirmState.convocatoria.nombre}"? Esta acción no se puede deshacer.`
-                : "¿Está seguro de eliminar este perfil? Esta acción no se puede deshacer."}
+                ? `¿Está seguro de eliminar el servicio "${confirmState.convocatoria.nombre}"? Esta acción no se puede deshacer.`
+                : "¿Está seguro de eliminar este servicio? Esta acción no se puede deshacer."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

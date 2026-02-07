@@ -13,10 +13,11 @@ interface Postulacion {
     email: string;
   };
   convocatoria: string;
+  oficinaCoordinacion: string;
   oficinaZonal: string;
   perfil: string;
   fechaPostulacion: string;
-  estado: 'en-revision' | 'preseleccionado' | 'rechazado' | 'finalista';
+  estado: string;
 }
 
 interface DetallePostulacionAdminProps {
@@ -42,14 +43,10 @@ export function DetallePostulacionAdmin({
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
-      case 'en-revision':
-        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">En Revisión</Badge>;
-      case 'preseleccionado':
-        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Preseleccionado</Badge>;
-      case 'finalista':
-        return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Finalista</Badge>;
-      case 'rechazado':
-        return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">No Seleccionado</Badge>;
+      case 'cumple':
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Cumple</Badge>;
+      case 'no-cumple':
+        return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">No cumple</Badge>;
       default:
         return <Badge variant="secondary">{estado}</Badge>;
     }
@@ -126,7 +123,7 @@ export function DetallePostulacionAdmin({
         </div>
       </Card>
 
-      {/* Información del Perfil */}
+      {/* Información del Servicio */}
       <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
         <div className="p-6">
           <div className="flex items-start justify-between mb-4">
@@ -151,7 +148,7 @@ export function DetallePostulacionAdmin({
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase">Oficina de Coordinación</p>
                 <p className="text-sm font-medium text-gray-900 mt-0.5">
-                  {postulacion.oficinaZonal}
+                  {postulacion.oficinaCoordinacion || postulacion.oficinaZonal}
                 </p>
               </div>
             </div>
@@ -196,10 +193,8 @@ export function DetallePostulacionAdmin({
                 onChange={(e) => setEstadoSeleccionado(e.target.value as any)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               >
-                <option value="en-revision">En Revisión</option>
-                <option value="preseleccionado">Preseleccionado</option>
-                <option value="finalista">Finalista</option>
-                <option value="rechazado">No Seleccionado</option>
+                <option value="cumple">Cumple</option>
+                <option value="no-cumple">No cumple</option>
               </select>
             </div>
 
@@ -235,7 +230,7 @@ export function DetallePostulacionAdmin({
 
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-xs text-blue-800">
-              <strong>Nota:</strong> Al cambiar el estado, el usuario recibirá una notificación por correo electrónico informándole sobre la actualización y que no implica contratación automática.
+              <strong>Nota:</strong> Al cambiar el estado, el registro quedará actualizado para el seguimiento interno.
             </p>
           </div>
         </div>
