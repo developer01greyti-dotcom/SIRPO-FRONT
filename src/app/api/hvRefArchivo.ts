@@ -8,7 +8,9 @@ export interface HvRefArchivo {
   tipoArchivo: string;
   guid: string;
   nombreOriginal?: string;
+  nombreOrig?: string;
   extension?: string;
+  ext?: string;
   mime?: string;
   sizeBytes?: number;
   ruta?: string;

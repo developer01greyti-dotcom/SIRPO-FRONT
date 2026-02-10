@@ -418,6 +418,40 @@ export function VistaPrevia({
   const cursos = cursosProp ?? cursosState;
   const experiencias = experienciasProp ?? experienciasState;
   const declaraciones = declaracionesProp ?? declaracionesState;
+  const adjuntos = [
+    ...formaciones
+      .filter((item) => Boolean(item.documento))
+      .map((item) => ({
+        id: `form-${item.id}`,
+        titulo: `Formación Académica: ${item.carrera || item.institucion || 'Sin especificar'}`,
+        url: buildFileUrl(item.documento),
+        nombre: `formacion_${item.id}`,
+      })),
+    ...cursos
+      .filter((item) => Boolean(item.documento))
+      .map((item) => ({
+        id: `curso-${item.id}`,
+        titulo: `Cursos o Programas de Especialización: ${item.descripcion || item.tipoEstudio || 'Sin especificar'}`,
+        url: buildFileUrl(item.documento),
+        nombre: `curso_${item.id}`,
+      })),
+    ...experiencias
+      .filter((item) => Boolean(item.certificadoPreview))
+      .map((item) => ({
+        id: `exp-${item.id}`,
+        titulo: `Experiencia Profesional: ${item.cargo || item.nombreEntidad || 'Sin especificar'}`,
+        url: item.certificadoPreview as string,
+        nombre: `experiencia_${item.id}`,
+      })),
+    ...declaraciones
+      .filter((item) => Boolean(item.archivoGuid))
+      .map((item) => ({
+        id: `decl-${item.id}`,
+        titulo: `Declaración Jurada: ${item.nombre || 'Sin especificar'}`,
+        url: buildFileUrl(item.archivoGuid as string),
+        nombre: `declaracion_${item.id}`,
+      })),
+  ];
   const totalExperiencia = (() => {
     let totalDays = 0;
     experiencias.forEach((exp) => {
@@ -1092,6 +1126,64 @@ export function VistaPrevia({
           <div className="text-center py-8">
             <CheckCircle2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-sm text-gray-500">No se han registrado declaraciones</p>
+          </div>
+        )}
+      </Card>
+
+      {/* Documentos Adjuntos */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+            <FileText className="w-5 h-5 text-emerald-600" />
+          </div>
+          <h4 className="text-lg font-bold" style={{ color: '#04a25c' }}>Documentos Adjuntos</h4>
+        </div>
+
+        {adjuntos.length > 0 ? (
+          <div className="space-y-6">
+            {adjuntos.map((adjunto, index) => (
+              <div key={adjunto.id}>
+                {index > 0 && <Separator className="my-6" />}
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-gray-900">{adjunto.titulo}</p>
+                  <div className="inline-flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium">
+                    <FileText className="w-3 h-3" />
+                    Documento adjunto
+                  </div>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <iframe
+                      src={adjunto.url}
+                      title={adjunto.titulo}
+                      className="w-full h-96"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 print:hidden">
+                    <button
+                      type="button"
+                      onClick={() => previewFile(adjunto.url)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Ver
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadFile(adjunto.url, adjunto.nombre)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Descargar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500">No hay documentos adjuntos registrados</p>
           </div>
         )}
       </Card>

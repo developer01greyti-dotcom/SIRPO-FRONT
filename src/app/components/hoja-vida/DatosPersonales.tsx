@@ -438,13 +438,17 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
         setSctrFileUrl(sctr ? buildFileUrl(sctr.guid) : null);
 
-        setVoucherMime(voucher?.mime || null);
+        setVoucherMime(
+          resolveMime(voucher?.mime, voucher?.nombreOriginal || voucher?.nombreOrig, voucher?.extension || voucher?.ext) || null,
+        );
 
-        setRnpMime(rnp?.mime || null);
+        setRnpMime(resolveMime(rnp?.mime, rnp?.nombreOriginal || rnp?.nombreOrig, rnp?.extension || rnp?.ext) || null);
 
-        setSeguroMime(seguro?.mime || null);
+        setSeguroMime(
+          resolveMime(seguro?.mime, seguro?.nombreOriginal || seguro?.nombreOrig, seguro?.extension || seguro?.ext) || null,
+        );
 
-        setSctrMime(sctr?.mime || null);
+        setSctrMime(resolveMime(sctr?.mime, sctr?.nombreOriginal || sctr?.nombreOrig, sctr?.extension || sctr?.ext) || null);
 
       } catch (error) {
 
@@ -628,6 +632,24 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
     return parts.length > 1 ? parts.pop() || '' : '';
 
+  };
+
+  const getExtFromName = (value?: string | null) => {
+    if (!value) return '';
+    const parts = value.split('.');
+    return (parts.length > 1 ? parts.pop() : parts[0])?.toLowerCase() || '';
+  };
+
+  const resolveMime = (
+    mime?: string | null,
+    nombreOriginal?: string | null,
+    extension?: string | null,
+  ) => {
+    const normalized = mime?.toLowerCase() || '';
+    if (normalized.includes('pdf')) return mime || 'application/pdf';
+    const ext = getExtFromName(extension) || getExtFromName(nombreOriginal);
+    if (ext === 'pdf') return 'application/pdf';
+    return mime || '';
   };
 
 
@@ -958,6 +980,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
       setVoucherDeleted(false);
 
+      setVoucherMime(resolveMime(file.type, file.name, getFileExt(file)) || null);
+
       revokePreviewUrl(voucherPreview);
       setVoucherPreview(URL.createObjectURL(file));
 
@@ -975,6 +999,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     setVoucherFile(null);
 
     setVoucherFileUrl(null);
+
+    setVoucherMime(null);
 
     if (voucherRefId) {
 
@@ -998,6 +1024,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     if (file) {
       setRnpFile(file);
       setRnpDeleted(false);
+      setRnpMime(resolveMime(file.type, file.name, getFileExt(file)) || null);
       revokePreviewUrl(rnpPreview);
       setRnpPreview(URL.createObjectURL(file));
     }
@@ -1008,6 +1035,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     setRnpPreview(null);
     setRnpFile(null);
     setRnpFileUrl(null);
+    setRnpMime(null);
     if (rnpRefId) {
       setRnpDeleted(true);
     }
@@ -1028,6 +1056,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
       setSeguroDeleted(false);
 
+      setSeguroMime(resolveMime(file.type, file.name, getFileExt(file)) || null);
+
       revokePreviewUrl(seguroSaludPreview);
       setSeguroSaludPreview(URL.createObjectURL(file));
 
@@ -1045,6 +1075,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     setSeguroSaludFile(null);
 
     setSeguroFileUrl(null);
+
+    setSeguroMime(null);
 
     if (seguroRefId) {
 
@@ -1074,6 +1106,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
       setSctrDeleted(false);
 
+      setSctrMime(resolveMime(file.type, file.name, getFileExt(file)) || null);
+
       revokePreviewUrl(sctrPreview);
       setSctrPreview(URL.createObjectURL(file));
 
@@ -1091,6 +1125,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     setSctrFile(null);
 
     setSctrFileUrl(null);
+
+    setSctrMime(null);
 
     if (sctrRefId) {
 
