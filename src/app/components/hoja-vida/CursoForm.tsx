@@ -58,6 +58,7 @@ export function CursoForm({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveMessageType, setSaveMessageType] = useState<'success' | 'error' | null>(null);
   const messageTimeoutRef = useRef<number | null>(null);
+  const todayIso = new Date().toISOString().split('T')[0];
   const [tipoInstitucion, setTipoInstitucion] = useState<string>('');
   const [tipoEstudio, setTipoEstudio] = useState<string>(curso?.tipoEstudio || '');
   const [distritoValue, setDistritoValue] = useState<string>(curso?.distrito || '');
@@ -275,6 +276,38 @@ export function CursoForm({
       horasLectivas: formData.get('horasLectivas') as string,
       documento: documentoPreview || '',
     };
+
+    if (nuevoCurso.fechaInicio && nuevoCurso.fechaFin) {
+      const start = new Date(nuevoCurso.fechaInicio);
+      const end = new Date(nuevoCurso.fechaFin);
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end < start) {
+        setSaveMessage('La fecha fin debe ser mayor a la fecha inicio.');
+        setSaveMessageType('error');
+        return;
+      }
+    }
+
+    if (nuevoCurso.fechaInicio) {
+      const start = new Date(nuevoCurso.fechaInicio);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(start.getTime()) && start > today) {
+        setSaveMessage('La fecha inicio no puede ser mayor a la fecha actual.');
+        setSaveMessageType('error');
+        return;
+      }
+    }
+
+    if (nuevoCurso.fechaFin) {
+      const end = new Date(nuevoCurso.fechaFin);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(end.getTime()) && end > today) {
+        setSaveMessage('La fecha fin no puede ser mayor a la fecha actual.');
+        setSaveMessageType('error');
+        return;
+      }
+    }
 
     if (isNacional) {
       nuevoCurso.ruc = formData.get('ruc') as string;
@@ -663,6 +696,7 @@ export function CursoForm({
               type="date"
               lang="es-PE"
               defaultValue={curso?.fechaInicio || ''}
+              max={todayIso}
             />
           </div>
 
@@ -674,6 +708,7 @@ export function CursoForm({
               type="date"
               lang="es-PE"
               defaultValue={curso?.fechaFin || ''}
+              max={todayIso}
             />
           </div>
 

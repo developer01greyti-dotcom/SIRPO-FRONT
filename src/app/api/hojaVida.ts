@@ -153,6 +153,137 @@ export interface HvExpUpsertPayload {
   usuarioAccion: number;
 }
 
+const normalizeHojaVidaActual = (raw: any): HojaVidaActual | null => {
+  if (!raw) return null;
+  const idHojaVida = Number(
+    raw.idHojaVida ??
+      raw.id_hoja_vida ??
+      raw.idHojaVidaActual ??
+      raw.id_hoja_vida_actual ??
+      raw.idHv ??
+      raw.id_hv ??
+      raw.id ??
+      0,
+  );
+  const version = Number(
+    raw.version ??
+      raw.versionHv ??
+      raw.version_hv ??
+      raw.versionHojaVida ??
+      raw.version_hoja_vida ??
+      0,
+  );
+  const estado =
+    raw.estado ?? raw.estadoHv ?? raw.estado_hv ?? raw.estadoHojaVida ?? raw.estado_hoja_vida ?? '';
+  const fechaRegistro =
+    raw.fechaRegistro ?? raw.fecha_registro ?? raw.fechaRegistroHv ?? raw.fecha_registro_hv ?? '';
+  if (!idHojaVida) return null;
+  return { idHojaVida, version, estado: String(estado || ''), fechaRegistro: String(fechaRegistro || '') };
+};
+
+const pickFirstValue = (raw: any, keys: string[]) => {
+  if (!raw) return undefined;
+  for (const key of keys) {
+    const value = raw?.[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'string' && value.trim() === '') continue;
+    return value;
+  }
+  return undefined;
+};
+
+const normalizeHojaVidaDatos = (raw: any): HojaVidaDatos | null => {
+  if (!raw) return null;
+
+  const idHvDatos = Number(
+    pickFirstValue(raw, ['idHvDatos', 'id_hv_datos', 'idHvDatosPersonales', 'id_hv_datos_personales', 'id']) ?? 0,
+  );
+  const tipoDocumentoId = pickFirstValue(raw, [
+    'tipoDocumentoId',
+    'tipo_documento',
+    'id_tipo_documento',
+    'tipoDoc',
+    'tipo_doc',
+  ]);
+  const tipoDocumento = pickFirstValue(raw, [
+    'tipoDocumento',
+    'tipo_documento_desc',
+    'tipoDocumentoDescripcion',
+    'tipo_doc_desc',
+  ]);
+  const numeroDocumento = pickFirstValue(raw, [
+    'numeroDocumento',
+    'nroDocumento',
+    'numero_documento',
+    'nro_documento',
+    'documento',
+  ]);
+  const nombres = pickFirstValue(raw, ['nombres', 'nombre', 'nombres_completos']);
+  const apellidoPaterno = pickFirstValue(raw, [
+    'apellidoPaterno',
+    'apePaterno',
+    'ape_paterno',
+    'apellido_paterno',
+    'apPrimer',
+    'primerApellido',
+  ]);
+  const apellidoMaterno = pickFirstValue(raw, [
+    'apellidoMaterno',
+    'apeMaterno',
+    'ape_materno',
+    'apellido_materno',
+    'apSegundo',
+    'segundoApellido',
+  ]);
+  const sexoId = pickFirstValue(raw, ['sexoId', 'sexo_id', 'id_sexo']);
+  const sexo = pickFirstValue(raw, ['sexo', 'sexo_desc', 'sexoDescripcion']);
+  const estadoCivilId = pickFirstValue(raw, ['estadoCivilId', 'estado_civil', 'id_estado_civil']);
+  const estadoCivil = pickFirstValue(raw, ['estadoCivil', 'estado_civil_desc', 'estadoCivilDescripcion']);
+  const fechaNacimiento = pickFirstValue(raw, ['fechaNacimiento', 'fecha_nacimiento', 'fechaNacimientoTexto']);
+  const nacionalidad = pickFirstValue(raw, ['nacionalidad', 'nacionalidad_desc']);
+  const telefonoCelular = pickFirstValue(raw, [
+    'telefonoCelular',
+    'telefono_celular',
+    'celular',
+    'telefono',
+  ]);
+  const correo = pickFirstValue(raw, ['correo', 'email', 'correo_electronico']);
+  const correoSecundario = pickFirstValue(raw, ['correoSecundario', 'correo_secundario', 'emailSecundario']);
+  const ruc = pickFirstValue(raw, ['ruc', 'nroRuc']);
+  const cuentaBn = pickFirstValue(raw, ['cuentaBn', 'cuenta_bn', 'numeroCuentaBn']);
+  const cciBn = pickFirstValue(raw, ['cciBn', 'cci_bn', 'cci']);
+  const direccion = pickFirstValue(raw, ['direccion', 'direccion_domicilio']);
+  const referencia = pickFirstValue(raw, ['referencia', 'referencia_domicilio']);
+  const distritoId = pickFirstValue(raw, ['distritoId', 'idUbigeo', 'id_ubigeo', 'ubigeoId']);
+  const distrito = pickFirstValue(raw, ['distrito', 'distrito_desc', 'nombreDistrito', 'ubigeo']);
+
+  return {
+    idHvDatos: idHvDatos || undefined,
+    tipoDocumentoId,
+    tipoDocumento: String(tipoDocumento ?? tipoDocumentoId ?? ''),
+    numeroDocumento: String(numeroDocumento ?? ''),
+    nombres: String(nombres ?? ''),
+    apellidoPaterno: String(apellidoPaterno ?? ''),
+    apellidoMaterno: String(apellidoMaterno ?? ''),
+    sexoId,
+    sexo: String(sexo ?? sexoId ?? ''),
+    estadoCivilId,
+    estadoCivil: String(estadoCivil ?? estadoCivilId ?? ''),
+    fechaNacimiento: String(fechaNacimiento ?? ''),
+    nacionalidad: String(nacionalidad ?? ''),
+    telefonoCelular: String(telefonoCelular ?? ''),
+    correo: String(correo ?? ''),
+    correoSecundario: correoSecundario ? String(correoSecundario) : '',
+    ruc: String(ruc ?? ''),
+    cuentaBn: String(cuentaBn ?? ''),
+    cciBn: String(cciBn ?? ''),
+    direccion: String(direccion ?? ''),
+    referencia: String(referencia ?? ''),
+    distritoId,
+    distrito: String(distrito ?? ''),
+  };
+};
+
 export const fetchHojaVidaActual = async ( 
   idPersona: number, 
   idUsuario: number, 
@@ -165,7 +296,7 @@ export const fetchHojaVidaActual = async (
   );
   const data = response.data;
   const normalized = Array.isArray(data) ? data[0] : data; 
-  return normalized ?? null; 
+  return normalizeHojaVidaActual(normalized); 
 }; 
 
 export const updateHojaVidaEstado = async ( 
@@ -188,7 +319,7 @@ export const fetchHojaVidaDatos = async (
   );
   const data = response.data;
   const normalized = Array.isArray(data) ? data[0] : data;
-  return normalized ?? null;
+  return normalizeHojaVidaDatos(normalized);
 };
 
 export const fetchHvFormList = async (

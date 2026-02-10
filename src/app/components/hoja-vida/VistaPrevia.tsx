@@ -118,6 +118,7 @@ export function VistaPrevia({
   const [completionMessage, setCompletionMessage] = useState<string | null>(null); 
   const [completionError, setCompletionError] = useState<string | null>(null); 
   const [loadError, setLoadError] = useState<string | null>(null); 
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   // Helper function para mostrar valores o placeholder
   const displayValue = (value: string | undefined, placeholder = 'Sin información') => {
     return value || placeholder;
@@ -146,10 +147,55 @@ export function VistaPrevia({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
+  const parseFecha = (value: string): Date | null => {
+    if (!value) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      const [year, month, day] = value.split('-');
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+    if (value.includes('/')) {
+      const [dd, mm, yyyy] = value.split('/');
+      if (dd && mm && yyyy) {
+        return new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      }
+    }
+    const normalized = value.toLowerCase();
+    if (normalized.includes(' de ')) {
+      const match = normalized.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)\s+de\s+(\d{4})/i);
+      if (match) {
+        const day = Number(match[1]);
+        const monthName = match[2];
+        const year = Number(match[3]);
+        const monthMap: Record<string, number> = {
+          enero: 0,
+          febrero: 1,
+          marzo: 2,
+          abril: 3,
+          mayo: 4,
+          junio: 5,
+          julio: 6,
+          agosto: 7,
+          septiembre: 8,
+          setiembre: 8,
+          octubre: 9,
+          noviembre: 10,
+          diciembre: 11,
+        };
+        const monthIndex = monthMap[monthName];
+        if (monthIndex !== undefined) {
+          return new Date(year, monthIndex, day);
+        }
+      }
+    }
+    const fallback = new Date(value);
+    return Number.isNaN(fallback.getTime()) ? null : fallback;
+  };
+
   const formatFecha = (fecha: string) => {
     if (!fecha) return '-';
-    const date = new Date(fecha);
-    return date.toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
+    const parsed = parseFecha(fecha);
+    if (!parsed) return fecha;
+    return parsed.toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const formatUbigeo = (departamento?: string, provincia?: string, distrito?: string) => {
@@ -197,6 +243,7 @@ export function VistaPrevia({
             setCursosState([]);
             setExperienciasState([]);
             setDeclaracionesState([]);
+            setLoadError('No se encontró una Hoja de Vida registrada para este usuario.');
           }
           return;
         }
@@ -371,6 +418,21 @@ export function VistaPrevia({
   const cursos = cursosProp ?? cursosState;
   const experiencias = experienciasProp ?? experienciasState;
   const declaraciones = declaracionesProp ?? declaracionesState;
+  const hasPersonalData = Boolean(
+    datosPersonales.nombres ||
+      datosPersonales.apellidoPaterno ||
+      datosPersonales.apellidoMaterno ||
+      datosPersonales.numeroDocumento ||
+      datosPersonales.correo,
+  );
+  const hasContent = Boolean(
+    hasPersonalData ||
+      formaciones.length ||
+      cursos.length ||
+      experiencias.length ||
+      declaraciones.length,
+  );
+  const canDownload = hasContent && !loadError;
 
   const nombreCompleto = `${datosPersonales.nombres} ${datosPersonales.apellidoPaterno} ${datosPersonales.apellidoMaterno}`.trim(); 
   const isHojaVidaCompleta = hojaVidaActual?.estado?.toUpperCase() === 'COMPLETO'; 
@@ -408,6 +470,25 @@ export function VistaPrevia({
     } 
   }; 
 
+  const handleDownload = () => {
+    if (isLoading) {
+      setDownloadError('La vista previa esta cargando, intenta nuevamente.');
+      return;
+    }
+    if (!canDownload) {
+      setDownloadError('No hay informacion disponible para descargar.');
+      return;
+    }
+    setDownloadError(null);
+    window.print();
+  };
+
+  useEffect(() => {
+    if (canDownload) {
+      setDownloadError(null);
+    }
+  }, [canDownload]);
+
   return (
     <div className="space-y-6">
       {/* Header with Actions */}
@@ -428,6 +509,9 @@ export function VistaPrevia({
               {loadError && (
                 <p className="text-xs text-red-600 mt-2">{loadError}</p>
               )}
+              {downloadError && (
+                <p className="text-xs text-red-600 mt-2">{downloadError}</p>
+              )}
               {completionMessage && (
                 <p className="text-xs text-green-700 mt-2">{completionMessage}</p>
               )}
@@ -447,8 +531,9 @@ export function VistaPrevia({
                 Completado
               </Button>
               <button
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden"
-                onClick={() => window.print()}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleDownload}
+                disabled={isLoading}
               >
                 <Download className="w-3.5 h-3.5" />
                 Descargar

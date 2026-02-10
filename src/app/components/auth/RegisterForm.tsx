@@ -15,6 +15,7 @@ import { Checkbox } from '../ui/checkbox';
 import { useEffect, useState } from 'react';
 import { fetchTipoDocDropdown, type DropdownItem } from '../../api/catalogos';
 import { registerPostulante, type RegisterResponse } from '../../api/auth';
+import { pedirDNI, pedirMigraciones, pedirRUC } from '../../api/pide';
 
 interface RegisterFormProps {
   onRegister: (user: RegisterResponse) => void;
@@ -29,6 +30,15 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
   const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<DropdownItem[]>([]);
   const [formError, setFormError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSearchingDoc, setIsSearchingDoc] = useState(false);
+  const [isSearchingRuc, setIsSearchingRuc] = useState(false);
+
+  const [numeroDocumento, setNumeroDocumento] = useState('');
+  const [nombres, setNombres] = useState('');
+  const [apellidoPaterno, setApellidoPaterno] = useState('');
+  const [apellidoMaterno, setApellidoMaterno] = useState('');
+  const [numeroRuc, setNumeroRuc] = useState('');
+  const [razonSocial, setRazonSocial] = useState('');
 
   useEffect(() => {
     let isActive = true;
@@ -79,10 +89,10 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
 
     const payload = {
       tipoDocumento,
-      numeroDocumento: (formData.get('numeroDocumento') as string) || '',
-      apellidoPaterno: (formData.get('apellidoPaterno') as string) || '',
-      apellidoMaterno: (formData.get('apellidoMaterno') as string) || '',
-      nombres: (formData.get('nombres') as string) || '',
+      numeroDocumento: (formData.get('numeroDocumento') as string) || numeroDocumento,
+      apellidoPaterno: (formData.get('apellidoPaterno') as string) || apellidoPaterno,
+      apellidoMaterno: (formData.get('apellidoMaterno') as string) || apellidoMaterno,
+      nombres: (formData.get('nombres') as string) || nombres,
       email: email.trim(),
       password,
     };
@@ -93,9 +103,207 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
       onRegister(response);
     } catch (error) {
       console.error('Error al registrar', error);
-      setFormError('Error al registrar. Intente nuevamente.');
+      const message =
+        (error as any)?.response?.data?.message ||
+        (error as any)?.response?.data?.error ||
+        (error as any)?.message ||
+        '';
+      if (typeof message === 'string' && message.toLowerCase().includes('documento ya registrado')) {
+        setFormError('Documento ya registrado.');
+      } else {
+        setFormError('Error al registrar. Intente nuevamente.');
+      }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const normalizeDocDesc = (value: string) => value.trim().toLowerCase();
+
+  const pickValue = (data: any, keys: string[]) => {
+    if (!data) return '';
+    for (const key of keys) {
+      const value = data?.[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return '';
+  };
+
+  const extractPayload = (data: any) => {
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    }
+    if (data?.datosPrincipales) {
+      return data.datosPrincipales;
+    }
+    if (data?.data?.datosPrincipales) {
+      return data.data.datosPrincipales;
+    }
+    if (data?.resultado?.datosPrincipales) {
+      return data.resultado.datosPrincipales;
+    }
+    if (data?.datosPersona) {
+      return data.datosPersona;
+    }
+    if (data?.data?.datosPersona) {
+      return data.data.datosPersona;
+    }
+    if (data?.resultado?.datosPersona) {
+      return data.resultado.datosPersona;
+    }
+    if (data?.result?.datosPersona) {
+      return data.result.datosPersona;
+    }
+    const candidates = [
+      data?.data,
+      data?.datos,
+      data?.resultado,
+      data?.result,
+      data?.data?.datos,
+      data?.data?.resultado,
+      data?.data?.result,
+      data?.data?.data,
+      data?.persona,
+      data?.reniec,
+      data?.pide,
+      data,
+    ];
+    for (const candidate of candidates) {
+      if (candidate && typeof candidate === 'object') {
+        return candidate;
+      }
+    }
+    return data ?? {};
+  };
+
+  const handleBuscarDocumento = async () => {
+    setFormError('');
+    if (!numeroDocumento.trim()) {
+      setFormError('Ingrese el numero de documento.');
+      return;
+    }
+    if (!tipoDocumentoDesc) {
+      setFormError('Seleccione un tipo de documento.');
+      return;
+    }
+    const desc = normalizeDocDesc(tipoDocumentoDesc);
+    try {
+      setIsSearchingDoc(true);
+      if (desc.includes('dni')) {
+        const data = await pedirDNI(numeroDocumento.trim());
+        const payload = extractPayload(data);
+        const nombresResp =
+          pickValue(payload, [
+            'nombres',
+            'prenombres',
+            'preNombres',
+            'nombre',
+            'nombresCompletos',
+            'nombreCompleto',
+            'nombre_completo',
+            'nombres_completos',
+          ]) || pickValue(data, ['nombres', 'prenombres', 'preNombres']);
+        const apellidoPatResp =
+          pickValue(payload, [
+            'apellidoPaterno',
+            'apePaterno',
+            'apPaterno',
+            'apellido_paterno',
+            'apPrimer',
+            'primerApellido',
+            'apellido1',
+          ]) || pickValue(data, ['apellidoPaterno', 'apellido_paterno', 'apPrimer']);
+        const apellidoMatResp =
+          pickValue(payload, [
+            'apellidoMaterno',
+            'apeMaterno',
+            'apMaterno',
+            'apellido_materno',
+            'apSegundo',
+            'segundoApellido',
+            'apellido2',
+          ]) || pickValue(data, ['apellidoMaterno', 'apellido_materno', 'apSegundo']);
+        if (!nombresResp && !apellidoPatResp && !apellidoMatResp) {
+          setFormError('No se encontraron datos para el DNI.');
+          return;
+        }
+        if (nombresResp) setNombres(nombresResp);
+        if (apellidoPatResp) setApellidoPaterno(apellidoPatResp);
+        if (apellidoMatResp) setApellidoMaterno(apellidoMatResp);
+        return;
+      }
+      if (desc.includes('carnet') || desc.includes('extranjer') || desc.includes('ce')) {
+        const data = await pedirMigraciones(numeroDocumento.trim());
+        const payload = extractPayload(data);
+        const nombresResp =
+          pickValue(payload, ['nombres', 'nombre', 'nombresCompletos', 'nombreCompleto']) ||
+          pickValue(data, ['nombres', 'nombre']);
+        const apellidoPatResp =
+          pickValue(payload, [
+            'apellidoPaterno',
+            'apPaterno',
+            'apellido_paterno',
+            'primerApellido',
+            'apellido1',
+          ]) || pickValue(data, ['apellidoPaterno', 'primerApellido']);
+        const apellidoMatResp =
+          pickValue(payload, [
+            'apellidoMaterno',
+            'apMaterno',
+            'apellido_materno',
+            'segundoApellido',
+            'apellido2',
+          ]) || pickValue(data, ['apellidoMaterno', 'segundoApellido']);
+        if (!nombresResp && !apellidoPatResp && !apellidoMatResp) {
+          setFormError('No se encontraron datos para el carnet de extranjeria.');
+          return;
+        }
+        if (nombresResp) setNombres(nombresResp);
+        if (apellidoPatResp) setApellidoPaterno(apellidoPatResp);
+        if (apellidoMatResp) setApellidoMaterno(apellidoMatResp);
+        return;
+      }
+      setFormError('Tipo de documento no soportado para busqueda.');
+    } catch (error) {
+      console.error('Error al consultar documento', error);
+      setFormError('No se pudo consultar el documento. Intente nuevamente.');
+    } finally {
+      setIsSearchingDoc(false);
+    }
+  };
+
+  const handleBuscarRuc = async () => {
+    setFormError('');
+    if (!numeroRuc.trim()) {
+      setFormError('Ingrese el numero de RUC.');
+      return;
+    }
+    try {
+      setIsSearchingRuc(true);
+      const data = await pedirRUC(numeroRuc.trim());
+      const payload = extractPayload(data);
+      const razon =
+        pickValue(payload, [
+          'razonSocial',
+          'razon_social',
+          'nombre_o_razon_social',
+          'razonSocialEmpresa',
+          'nombreORazonSocial',
+          'nombre',
+        ]) ||
+        pickValue(data, ['razonSocial', 'razon_social', 'nombre_o_razon_social']);
+      if (!razon) {
+        setFormError('No se encontro razon social para el RUC.');
+        return;
+      }
+      setRazonSocial(razon);
+    } catch (error) {
+      console.error('Error al consultar RUC', error);
+      setFormError('No se pudo consultar el RUC. Intente nuevamente.');
+    } finally {
+      setIsSearchingRuc(false);
     }
   };
 
@@ -187,12 +395,21 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   placeholder=""
                   className="h-9"
                   maxLength={tipoDocumentoDesc.toLowerCase().includes('dni') ? 8 : 12}
+                  value={numeroDocumento}
+                  onChange={(e) => setNumeroDocumento(e.target.value)}
                   required
                 />
                 </div>
-                <Button type="button" variant="outline" className="gap-2 h-9" style={{ marginBottom: '6pt' }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2 h-9"
+                  style={{ marginBottom: '6pt' }}
+                  onClick={handleBuscarDocumento}
+                  disabled={isSearchingDoc}
+                >
                   <Search className="w-4 h-4" />
-                  Buscar
+                  {isSearchingDoc ? 'Buscando...' : 'Buscar'}
                 </Button>
               </div>
             </div>
@@ -208,6 +425,8 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   name="nombres"
                   type="text"
                   placeholder=""
+                  value={nombres}
+                  onChange={(e) => setNombres(e.target.value)}
                   required
                 />
               </div>
@@ -221,6 +440,8 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   name="apellidoPaterno"
                   type="text"
                   placeholder=""
+                  value={apellidoPaterno}
+                  onChange={(e) => setApellidoPaterno(e.target.value)}
                   required
                 />
               </div>
@@ -237,6 +458,8 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   name="apellidoMaterno"
                   type="text"
                   placeholder=""
+                  value={apellidoMaterno}
+                  onChange={(e) => setApellidoMaterno(e.target.value)}
                   required
                 />
               </div>
@@ -251,14 +474,23 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   </Label>
                   <Input
                     id="numeroRuc"
+                    name="numeroRuc"
                     type="text"
                     placeholder=""
                     maxLength={11}
+                    value={numeroRuc}
+                    onChange={(e) => setNumeroRuc(e.target.value)}
                   />
                 </div>
-                <Button type="button" variant="outline" className="gap-2 h-9">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2 h-9"
+                  onClick={handleBuscarRuc}
+                  disabled={isSearchingRuc}
+                >
                   <Search className="w-4 h-4" />
-                  Buscar
+                  {isSearchingRuc ? 'Buscando...' : 'Buscar'}
                 </Button>
               </div>
 
@@ -268,8 +500,11 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                 </Label>
                 <Input
                   id="razonSocial"
+                  name="razonSocial"
                   type="text"
                   placeholder=""
+                  value={razonSocial}
+                  onChange={(e) => setRazonSocial(e.target.value)}
                 />
               </div>
             </div>

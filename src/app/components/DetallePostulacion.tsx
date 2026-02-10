@@ -13,7 +13,7 @@ interface Postulacion {
   fechaPostulacion: string;
   fechaInicio: string;
   fechaFin: string;
-  estado: 'en-revision' | 'preseleccionado' | 'rechazado' | 'finalista';
+  estado: string;
 }
 
 interface Formacion {
@@ -69,13 +69,40 @@ export function DetallePostulacion({
   experiencias,
   onClose,
 }: DetallePostulacionProps) {
+  const normalizeEstado = (estado: string) => {
+    const normalized = (estado || '').toLowerCase().trim();
+    if (normalized === '1') return 'cumple';
+    if (normalized === '2') return 'no cumple';
+    if (normalized === '0') return 'registrado';
+    const compact = normalized.replace(/[-\s]/g, '');
+    if (compact.includes('nocumple')) return 'no cumple';
+    if (compact.includes('cumple')) return 'cumple';
+    if (compact.includes('registr') || compact.includes('revision')) return 'registrado';
+    return normalized;
+  };
+
   const getEstadoBadge = (estado: string) => {
-    switch (estado) {
-      case 'en-revision':
+    const normalized = normalizeEstado(estado);
+    switch (normalized) {
+      case 'registrado':
         return (
           <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 gap-1">
             <Clock className="w-3 h-3" />
-            En Revisión
+            Registrado
+          </Badge>
+        );
+      case 'cumple':
+        return (
+          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 gap-1">
+            <CheckCircle className="w-3 h-3" />
+            Cumple
+          </Badge>
+        );
+      case 'no cumple':
+        return (
+          <Badge variant="secondary" className="bg-gray-100 text-gray-700 gap-1">
+            <XCircle className="w-3 h-3" />
+            No cumple
           </Badge>
         );
       case 'preseleccionado':

@@ -98,6 +98,34 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
         return new Date(Number(yyyy), Number(mm) - 1, Number(dd));
       }
     }
+    const normalized = value.toLowerCase();
+    if (normalized.includes(' de ')) {
+      const match = normalized.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)\s+de\s+(\d{4})/i);
+      if (match) {
+        const day = Number(match[1]);
+        const monthName = match[2];
+        const year = Number(match[3]);
+        const monthMap: Record<string, number> = {
+          enero: 0,
+          febrero: 1,
+          marzo: 2,
+          abril: 3,
+          mayo: 4,
+          junio: 5,
+          julio: 6,
+          agosto: 7,
+          septiembre: 8,
+          setiembre: 8,
+          octubre: 9,
+          noviembre: 10,
+          diciembre: 11,
+        };
+        const monthIndex = monthMap[monthName];
+        if (monthIndex !== undefined) {
+          return new Date(year, monthIndex, day);
+        }
+      }
+    }
     const fallback = new Date(value);
     return Number.isNaN(fallback.getTime()) ? null : fallback;
   };
@@ -192,8 +220,9 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     experiencias.forEach((exp) => {
       const start = parseFecha(exp.fechaInicio);
       if (!start) return;
+      const motivo = (exp.motivoCese || '').toLowerCase();
       const end =
-        exp.motivoCese === 'actualidad'
+        motivo.includes('actual')
           ? new Date()
           : parseFecha(exp.fechaFin) ?? new Date();
       if (end < start) return;

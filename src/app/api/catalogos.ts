@@ -17,7 +17,7 @@ export const fetchTipoDocDropdown = async (): Promise<DropdownItem[]> => {
 
 export const fetchUbigeoDistritoList = async (codigo: string): Promise<DropdownItem[]> => {
   const response = await apiClient.post<DropdownItem[]>('/ubidist/list', {
-    estructura: { codigo },
+    estructura: { codigo: codigo.toUpperCase() },
   });
   return response.data;
 };

@@ -536,7 +536,7 @@ export default function App() {
         idConvocatoria, 
         idHojaVida: hojaVidaId, 
         numeroPostulacion: '', 
-        estado: 'en-revision', 
+        estado: 'registrado', 
         observacion: '', 
         usuarioAccion: postulanteUser.idUsuario, 
       }); 

@@ -25,10 +25,23 @@ export interface RegisterResponse {
 export const registerPostulante = async (
   payload: RegisterPayload,
 ): Promise<RegisterResponse> => {
-  const response = await apiClient.post<RegisterResponse>('/usrpost_reg/list', {
-    estructura: payload,
-  });
-  return response.data;
+  const send = async (url: string) => {
+    const response = await apiClient.post<RegisterResponse | RegisterResponse[]>(url, {
+      estructura: payload,
+    });
+    const data = response.data;
+    return Array.isArray(data) ? data[0] : data;
+  };
+
+  try {
+    return await send('/usrpost_reg/list');
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status === 404) {
+      return await send('/usrpost_reg');
+    }
+    throw error;
+  }
 };
 
 export interface LoginPayload {

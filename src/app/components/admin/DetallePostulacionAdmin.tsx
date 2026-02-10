@@ -1,12 +1,24 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { X, Calendar, Briefcase, Building2, User, Mail, Save, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { VistaPrevia } from '../hoja-vida/VistaPrevia';
+import { updatePostulacion } from '../../api/postulaciones';
+import {
+  fetchHojaVidaDatos,
+  fetchHvCurList,
+  fetchHvDeclList,
+  fetchHvExpList,
+  fetchHvFormList,
+} from '../../api/hojaVida';
 
 interface Postulacion {
   id: string;
+  idPersona: number;
+  idConvocatoria: string;
+  idHojaVida: number;
+  numeroPostulacion?: string;
   postulante: {
     nombre: string;
     documento: string;
@@ -18,34 +30,234 @@ interface Postulacion {
   perfil: string;
   fechaPostulacion: string;
   estado: string;
+  observacion?: string;
 }
 
 interface DetallePostulacionAdminProps {
   postulacion: Postulacion;
+  adminUserId: number;
   onClose: () => void;
-  onActualizarEstado: (postulacionId: string, nuevoEstado: string) => void;
+  onActualizarEstado: (postulacionId: string, nuevoEstado: string, observacion: string) => void;
 }
 
 export function DetallePostulacionAdmin({
   postulacion,
+  adminUserId,
   onClose,
   onActualizarEstado,
 }: DetallePostulacionAdminProps) {
   const [estadoSeleccionado, setEstadoSeleccionado] = useState(postulacion.estado);
-  const [comentario, setComentario] = useState('');
+  const [comentario, setComentario] = useState(postulacion.observacion ?? '');
   const [showConfirmacion, setShowConfirmacion] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [hvLoading, setHvLoading] = useState(false);
+  const [hvError, setHvError] = useState<string | null>(null);
+  const [hvDatos, setHvDatos] = useState<any | null>(null);
+  const [hvFormaciones, setHvFormaciones] = useState<any[]>([]);
+  const [hvCursos, setHvCursos] = useState<any[]>([]);
+  const [hvExperiencias, setHvExperiencias] = useState<any[]>([]);
+  const [hvDeclaraciones, setHvDeclaraciones] = useState<any[]>([]);
 
-  const handleGuardarEstado = () => {
-    onActualizarEstado(postulacion.id, estadoSeleccionado);
-    setShowConfirmacion(true);
-    setTimeout(() => setShowConfirmacion(false), 3000);
+  const handleGuardarEstado = async () => {
+    if (!adminUserId) {
+      setSaveError('No se encontró el usuario administrador.');
+      return;
+    }
+    if (!postulacion.id) {
+      setSaveError('No se encontró la postulación.');
+      return;
+    }
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const ok = await updatePostulacion({
+        idPostulacion: Number(postulacion.id),
+        idPersona: Number(postulacion.idPersona || 0),
+        idConvocatoria: Number(postulacion.idConvocatoria || 0),
+        idHojaVida: Number(postulacion.idHojaVida || 0),
+        numeroPostulacion: postulacion.numeroPostulacion || '',
+        estado: estadoSeleccionado,
+        observacion: comentario || '',
+        usuarioAccion: adminUserId,
+      });
+      if (!ok) {
+        setSaveError('No se pudo actualizar el estado.');
+        return;
+      }
+      onActualizarEstado(postulacion.id, estadoSeleccionado, comentario || '');
+      setShowConfirmacion(true);
+      setTimeout(() => setShowConfirmacion(false), 3000);
+    } catch (error) {
+      setSaveError('No se pudo actualizar el estado.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
+  useEffect(() => {
+    let isActive = true;
+    const loadHojaVida = async () => {
+      const idHojaVida = Number(postulacion.idHojaVida || 0);
+      if (!idHojaVida) {
+        if (isActive) {
+          setHvError('No se encontro la hoja de vida del postulante.');
+        }
+        return;
+      }
+      setHvLoading(true);
+      setHvError(null);
+      try {
+        const [datos, formacionesData, cursosData, experienciasData, declaracionesData] = await Promise.all([
+          fetchHojaVidaDatos(idHojaVida),
+          fetchHvFormList(idHojaVida),
+          fetchHvCurList(idHojaVida),
+          fetchHvExpList(idHojaVida),
+          fetchHvDeclList(idHojaVida),
+        ]);
+        if (!isActive) return;
+        setHvDatos(datos);
+        setHvFormaciones(Array.isArray(formacionesData) ? formacionesData : formacionesData ? [formacionesData] : []);
+        setHvCursos(Array.isArray(cursosData) ? cursosData : cursosData ? [cursosData] : []);
+        setHvExperiencias(Array.isArray(experienciasData) ? experienciasData : experienciasData ? [experienciasData] : []);
+        setHvDeclaraciones(Array.isArray(declaracionesData) ? declaracionesData : declaracionesData ? [declaracionesData] : []);
+      } catch (error) {
+        if (isActive) {
+          setHvError('No se pudo cargar la hoja de vida.');
+        }
+      } finally {
+        if (isActive) {
+          setHvLoading(false);
+        }
+      }
+    };
+
+    loadHojaVida();
+    return () => {
+      isActive = false;
+    };
+  }, [postulacion.idHojaVida]);
+
+  const buildFileUrl = (guid: string) => {
+    const apiBaseUrl =
+      (import.meta as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ||
+      'http://localhost:8087/sirpo/v1';
+    const params = new URLSearchParams({ guid });
+    return `${apiBaseUrl}/hv_ref_archivo/file?${params.toString()}`;
+  };
+
+  const mapDatosPersonales = (datos: any) => {
+    if (!datos) return null;
+    return {
+      tipoDocumento: datos.tipoDocumento || String(datos.tipoDocumentoId ?? ''),
+      estadoCivil: datos.estadoCivil || '',
+      numeroDocumento: datos.numeroDocumento || '',
+      nombres: datos.nombres || '',
+      apellidoPaterno: datos.apellidoPaterno || '',
+      apellidoMaterno: datos.apellidoMaterno || '',
+      sexo: typeof datos.sexo === 'string' ? datos.sexo : String(datos.sexo ?? ''),
+      fechaNacimiento: datos.fechaNacimiento || '',
+      nacionalidad: datos.nacionalidad || '',
+      correo: datos.correo || '',
+      correoSecundario: datos.correoSecundario || '',
+      ruc: datos.ruc || '',
+      celular: datos.telefonoCelular || '',
+      cuentaBn: datos.cuentaBn || '',
+      cciBn: datos.cciBn || '',
+      direccion: datos.direccion || '',
+      referencia: datos.referencia || '',
+      departamento: datos.departamento ?? datos.departamentoDescripcion ?? '',
+      provincia: datos.provincia ?? datos.provinciaDescripcion ?? '',
+      distrito: datos.distrito ?? datos.distritoDescripcion ?? '',
+    };
+  };
+
+  const mapFormaciones = (items: any[]) =>
+    items.map((item) => ({
+      id: String(item.id ?? item.idHvFormacion ?? ''),
+      nivelEstudio: item.nivelEstudio ?? '',
+      carrera: item.carrera ?? '',
+      tipoInstitucion: item.tipoInstitucion ?? '',
+      tipoEntidad: item.tipoEntidad ?? '',
+      institucion: item.institucion ?? '',
+      ruc: item.ruc ?? '',
+      departamento: item.departamentoDescripcion ?? item.departamento ?? '',
+      provincia: item.provinciaDescripcion ?? item.provincia ?? '',
+      distrito: item.distritoDescripcion ?? item.distrito ?? '',
+      pais: item.pais ?? '',
+      fecha: item.fechaObtencion ?? item.fecha ?? '',
+      documento: item.archivoGuid ?? '',
+    }));
+
+  const mapCursos = (items: any[]) =>
+    items.map((item) => ({
+      id: String(item.id ?? item.idHvCurso ?? ''),
+      tipoEstudio: item.tipoEstudio ?? '',
+      descripcion: item.descripcion ?? '',
+      tipoInstitucion: item.tipoInstitucion ?? '',
+      institucion: item.institucion ?? '',
+      ruc: item.ruc ?? '',
+      departamento: item.departamentoDescripcion ?? item.departamento ?? '',
+      provincia: item.provinciaDescripcion ?? item.provincia ?? '',
+      distrito: item.distritoDescripcion ?? item.distrito ?? '',
+      pais: item.pais ?? '',
+      fechaInicio: item.fechaInicio ?? '',
+      fechaFin: item.fechaFin ?? '',
+      horasLectivas: String(item.horasLectivas ?? ''),
+      documento: item.archivoGuid ?? '',
+    }));
+
+  const mapExperiencias = (items: any[]) =>
+    items.map((item) => ({
+      id: String(item.id ?? item.idHvExperiencia ?? ''),
+      tipoExperiencia: item.tipoExperiencia ?? '',
+      tipoEntidad: item.tipoEntidad ?? '',
+      nombreEntidad: item.nombreEntidad ?? '',
+      departamento: item.departamentoDescripcion ?? item.departamento ?? '',
+      provincia: item.provinciaDescripcion ?? item.provincia ?? '',
+      distrito: item.distritoDescripcion ?? item.distrito ?? '',
+      area: item.area ?? '',
+      cargo: item.cargo ?? '',
+      funcionesPrincipales: item.funcionesPrincipales ?? '',
+      motivoCese: item.motivoCese ?? '',
+      fechaInicio: item.fechaInicio ?? '',
+      fechaFin: item.fechaFin ?? '',
+      certificadoPreview: item.archivoGuid ? buildFileUrl(String(item.archivoGuid)) : null,
+    }));
+
+  const mapDeclaraciones = (items: any[]) =>
+    items.map((item: any, index: number) => ({
+      id: String(item.id ?? item.idDeclaracionTipo ?? index),
+      nombre: item.nombre ?? '',
+      descripcion: item.descripcion ?? '',
+      archivoAdjunto: null,
+      archivoGuid: item.archivoGuid ?? '',
+    }));
+
   const getEstadoBadge = (estado: string) => {
-    switch (estado) {
+    const normalized = (estado || '').toLowerCase().trim();
+    if (normalized === '1') {
+      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Cumple</Badge>;
+    }
+    if (normalized === '2') {
+      return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">No cumple</Badge>;
+    }
+    if (normalized === '0') {
+      return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Registrado</Badge>;
+    }
+    if (normalized.replace(/[-\s]/g, '').includes('nocumple')) {
+      return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">No cumple</Badge>;
+    }
+    if (normalized.includes('cumple')) {
+      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Cumple</Badge>;
+    }
+    if (normalized.includes('registr') || normalized.includes('revision')) {
+      return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Registrado</Badge>;
+    }
+    switch (normalized) {
       case 'cumple':
         return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Cumple</Badge>;
-      case 'no-cumple':
+      case 'no cumple':
         return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">No cumple</Badge>;
       default:
         return <Badge variant="secondary">{estado}</Badge>;
@@ -82,6 +294,11 @@ export function DetallePostulacionAdmin({
               Estado actualizado exitosamente
             </p>
           </div>
+        </Card>
+      )}
+      {saveError && (
+        <Card className="p-4 bg-red-50 border-red-200">
+          <p className="text-sm font-medium text-red-700">{saveError}</p>
         </Card>
       )}
 
@@ -193,8 +410,9 @@ export function DetallePostulacionAdmin({
                 onChange={(e) => setEstadoSeleccionado(e.target.value as any)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               >
+                <option value="registrado">Registrado</option>
                 <option value="cumple">Cumple</option>
-                <option value="no-cumple">No cumple</option>
+                <option value="no cumple">No cumple</option>
               </select>
             </div>
 
@@ -215,11 +433,11 @@ export function DetallePostulacionAdmin({
           <div className="flex items-center gap-3">
             <Button
               onClick={handleGuardarEstado}
-              disabled={estadoSeleccionado === postulacion.estado}
+              disabled={isSaving || estadoSeleccionado === postulacion.estado}
               className="bg-green-600 hover:bg-green-700 gap-2"
             >
               <Save className="w-4 h-4" />
-              Guardar Estado
+              {isSaving ? 'Guardando...' : 'Guardar Estado'}
             </Button>
             {estadoSeleccionado !== postulacion.estado && (
               <p className="text-sm text-amber-700 font-medium">
@@ -246,62 +464,20 @@ export function DetallePostulacionAdmin({
             Información registrada en el sistema
           </p>
         </div>
-
-        <VistaPrevia
-          formaciones={[
-            {
-              id: '1',
-              nivelEstudio: 'Titulado',
-              carrera: 'Ingeniería Forestal',
-              tipoInstitucion: 'Nacional',
-              tipoEntidad: 'Pública',
-              institucion: 'Universidad Mayor de San Marcos',
-              ruc: '20123456789',
-              departamento: 'Lima',
-              provincia: 'Lima',
-              distrito: 'Lima',
-              fecha: '2008-12-12',
-              documento: 'diploma_forestal.pdf',
-            },
-          ]}
-          cursos={[
-            {
-              id: '1',
-              tipoEstudio: 'Especialización',
-              descripcion: 'Gestión Pública y Desarrollo Sostenible',
-              tipoInstitucion: 'Nacional',
-              institucion: 'Universidad Mayor de San Marcos',
-              ruc: '20123456789',
-              departamento: 'Lima',
-              provincia: 'Lima',
-              distrito: 'Lima',
-              fechaInicio: '2021-01-15',
-              fechaFin: '2021-06-15',
-              horasLectivas: '90',
-              documento: 'certificado_gestion.pdf',
-            },
-          ]}
-          experiencias={[
-            {
-              id: '1',
-              tipoExperiencia: 'empleo',
-              tipoEntidad: 'publico',
-              nombreEntidad: 'Ministerio de Agricultura y Riego',
-              departamento: 'Lima',
-              provincia: 'Lima',
-              distrito: 'Miraflores',
-              area: 'Proyectos Agrícolas',
-              cargo: 'Extensionista Agrícola',
-              funcionesPrincipales: 'Capacitación y asistencia técnica a productores agrícolas.',
-              motivoCese: 'fin-contrato',
-              fechaInicio: '2022-01-15',
-              fechaFin: '2024-12-31',
-              certificadoPreview: 'certificado_minagri.pdf',
-            },
-          ]}
-          declaraciones={[]}
-          hideHeader={true}
-        />
+        {hvLoading ? (
+          <div className="text-sm text-gray-600">Cargando hoja de vida...</div>
+        ) : hvError ? (
+          <div className="text-sm text-red-600">{hvError}</div>
+        ) : (
+          <VistaPrevia
+            datosPersonales={mapDatosPersonales(hvDatos) || undefined}
+            formaciones={mapFormaciones(hvFormaciones)}
+            cursos={mapCursos(hvCursos)}
+            experiencias={mapExperiencias(hvExperiencias)}
+            declaraciones={mapDeclaraciones(hvDeclaraciones)}
+            hideHeader={true}
+          />
+        )}
       </div>
 
       {/* Botón inferior */}

@@ -16,7 +16,9 @@ export interface PostulacionListItem {
   idPersona: number;
   idConvocatoria: number;
   idHojaVida: number;
+  numeroPostulacion?: string;
   estado: string;
+  observacion?: string;
   fechaPostulacion?: string;
   idOficinaCoordinacion?: number;
   oficinaCoordinacion?: string;
@@ -69,6 +71,44 @@ export const upsertPostulacion = async (
   return extractNumeroPostulacion(response.data);
 };
 
+export const updatePostulacion = async (
+  payload: PostulacionUpsertPayload,
+): Promise<boolean> => {
+  const requestBody = {
+    estructura: {
+      idPostulacion: payload.idPostulacion,
+      idPersona: payload.idPersona,
+      idConvocatoria: payload.idConvocatoria,
+      idHojaVida: payload.idHojaVida,
+      numeroPostulacion: payload.numeroPostulacion,
+      estado: payload.estado,
+      observacion: payload.observacion,
+      usuarioAccion: payload.usuarioAccion,
+    },
+  };
+  try {
+    const response = await apiClient.put<boolean>('/post/update', requestBody);
+    return Boolean(response.data);
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status === 405 || status === 404) {
+      try {
+        const fallback = await apiClient.post<boolean>('/post/update', requestBody);
+        return Boolean(fallback.data);
+      } catch (fallbackError: any) {
+        const fallbackStatus = fallbackError?.response?.status;
+        if (fallbackStatus === 405 || fallbackStatus === 404) {
+          const upsertResponse = await apiClient.post<any>('/post_upsert/list', requestBody);
+          const numero = extractNumeroPostulacion(upsertResponse.data);
+          return Boolean(numero || upsertResponse.data);
+        }
+        throw fallbackError;
+      }
+    }
+    throw error;
+  }
+};
+
 export const fetchPostulacionesByPersona = async (
   idPersona: number,
 ): Promise<PostulacionListItem[]> => {
@@ -85,7 +125,9 @@ export const fetchPostulacionesByPersona = async (
     idPersona: Number(item.idPersona ?? item.id_persona ?? idPersona ?? 0),
     idConvocatoria: Number(item.idConvocatoria ?? item.id_convocatoria ?? 0),
     idHojaVida: Number(item.idHojaVida ?? item.id_hoja_vida ?? 0),
+    numeroPostulacion: item.numeroPostulacion ?? item.numero_postulacion ?? '',
     estado: item.estado ?? '',
+    observacion: item.observacion ?? item.observacion_postulacion ?? '',
     fechaPostulacion: item.fechaPostulacion ?? item.fecha_postulacion ?? '',
     idOficinaCoordinacion: item.idOficinaCoordinacion ?? item.id_oficina_coordinacion ?? undefined,
     oficinaCoordinacion: item.oficinaCoordinacion ?? item.nombreOficinaCoordinacion ?? '',
@@ -110,7 +152,9 @@ export const fetchPostulacionesByConvocatoria = async (
     idPersona: Number(item.idPersona ?? item.id_persona ?? 0),
     idConvocatoria: Number(item.idConvocatoria ?? item.id_convocatoria ?? idConvocatoria ?? 0),
     idHojaVida: Number(item.idHojaVida ?? item.id_hoja_vida ?? 0),
+    numeroPostulacion: item.numeroPostulacion ?? item.numero_postulacion ?? '',
     estado: item.estado ?? '',
+    observacion: item.observacion ?? item.observacion_postulacion ?? '',
     fechaPostulacion: item.fechaPostulacion ?? item.fecha_postulacion ?? '',
     idOficinaCoordinacion: item.idOficinaCoordinacion ?? item.id_oficina_coordinacion ?? undefined,
     oficinaCoordinacion: item.oficinaCoordinacion ?? item.nombreOficinaCoordinacion ?? '',

@@ -90,6 +90,7 @@ export function ExperienciaForm({
     (item) => String(item.id) === motivoCese,
   )?.descripcion?.toLowerCase() || '';
   const isActualidad = motivoCeseDescripcion.includes('actualidad');
+  const todayIso = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     let isActive = true;
@@ -253,6 +254,38 @@ export function ExperienciaForm({
       fechaFin: formData.get('fechaFin') as string,
       certificadoPreview: certificadoPreview,
     };
+
+    if (!isActualidad && nuevaExperiencia.fechaInicio && nuevaExperiencia.fechaFin) {
+      const start = new Date(nuevaExperiencia.fechaInicio);
+      const end = new Date(nuevaExperiencia.fechaFin);
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end < start) {
+        setSaveMessage('La fecha fin debe ser mayor a la fecha inicio.');
+        setSaveMessageType('error');
+        return;
+      }
+    }
+
+    if (nuevaExperiencia.fechaInicio) {
+      const start = new Date(nuevaExperiencia.fechaInicio);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(start.getTime()) && start > today) {
+        setSaveMessage('La fecha inicio no puede ser mayor a la fecha actual.');
+        setSaveMessageType('error');
+        return;
+      }
+    }
+
+    if (!isActualidad && nuevaExperiencia.fechaFin) {
+      const end = new Date(nuevaExperiencia.fechaFin);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(end.getTime()) && end > today) {
+        setSaveMessage('La fecha fin no puede ser mayor a la fecha actual.');
+        setSaveMessageType('error');
+        return;
+      }
+    }
 
     const payload = {
       idHvExperiencia: Number(experiencia?.idHvExperiencia || experiencia?.id || 0),
@@ -552,6 +585,7 @@ export function ExperienciaForm({
               type="date"
               lang="es-PE"
               defaultValue={experiencia?.fechaInicio || ''}
+              max={todayIso}
             />
           </div>
 
@@ -565,6 +599,7 @@ export function ExperienciaForm({
                 type="date"
                 lang="es-PE"
                 defaultValue={experiencia?.fechaFin || ''}
+                max={todayIso}
               />
             </div>
           )}

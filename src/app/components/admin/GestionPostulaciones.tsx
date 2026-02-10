@@ -22,12 +22,16 @@ interface ServicioItem {
   id: string;
   nombre: string;
   oficinaCoordinacion: string;
+  oficinaZonal: string;
   perfil: string;
 }
 
 interface Postulacion {
   id: string;
+  idPersona: number;
   idConvocatoria: string;
+  idHojaVida: number;
+  numeroPostulacion?: string;
   postulante: {
     nombre: string;
     documento: string;
@@ -39,6 +43,7 @@ interface Postulacion {
   perfil: string;
   fechaPostulacion: string;
   estado: string;
+  observacion?: string;
 }
 
 interface GestionPostulacionesProps {
@@ -58,6 +63,7 @@ const defaultPostFilters = {
   oficinaZonal: '',
   oficinaCoordinacion: '',
   perfil: '',
+  anio: '',
 };
 
 export function GestionPostulaciones({
@@ -96,11 +102,17 @@ export function GestionPostulaciones({
       const id = String(item?.idConvocatoria ?? item?.id ?? '').trim();
       const nombre = String(item?.nombre ?? item?.titulo ?? '').trim();
       if (!id || !nombre) return;
+      const oficinaZonal =
+        String(item?.oficinaZonal ?? item?.nombreOficinaZonal ?? '').trim() ||
+        (String(item?.oficinaCoordinacion ?? '').includes('/')
+          ? String(item?.oficinaCoordinacion ?? '').split('/')[0]?.trim()
+          : '');
       if (!map.has(id)) {
         map.set(id, {
           id,
           nombre,
           oficinaCoordinacion: String(item?.oficinaCoordinacion ?? '').trim(),
+          oficinaZonal,
           perfil: String(item?.perfil ?? '').trim(),
         });
       }
@@ -160,9 +172,26 @@ export function GestionPostulaciones({
     return Array.from(new Set(values));
   }, [postulaciones]);
 
+  const normalizeEstadoValue = (value: string) => {
+    const normalized = (value || '').toLowerCase().trim();
+    if (!normalized) return '';
+    if (normalized === '1') return 'cumple';
+    if (normalized === '2') return 'no cumple';
+    if (normalized === '0') return 'registrado';
+    const compact = normalized.replace(/[-\s]/g, '');
+    if (compact.includes('nocumple')) return 'no cumple';
+    if (compact.includes('cumple')) return 'cumple';
+    if (compact.includes('registr')) return 'registrado';
+    if (compact.includes('revision') || compact.includes('revisi')) return 'registrado';
+    return normalized;
+  };
+
   const mapPostulacion = (item: PostulacionAdminListItem): Postulacion => ({
     id: String(item.idPostulacion ?? ''),
+    idPersona: Number(item.idPersona ?? 0),
     idConvocatoria: String(item.idConvocatoria ?? ''),
+    idHojaVida: Number(item.idHojaVida ?? 0),
+    numeroPostulacion: item.numeroPostulacion ?? '',
     postulante: {
       nombre: item.postulanteNombre ?? '',
       documento: item.postulanteDocumento ?? '',
@@ -173,10 +202,11 @@ export function GestionPostulaciones({
     oficinaZonal: item.oficinaZonal ?? '',
     perfil: item.perfil ?? '',
     fechaPostulacion: item.fechaPostulacion ?? '',
-    estado: item.estado ?? '',
+    estado: normalizeEstadoValue(item.estado ?? ''),
+    observacion: item.observacion ?? '',
   });
 
-  const normalizeEstado = (value: string) => (value || '').trim().toLowerCase();
+  const normalizeEstado = (value: string) => normalizeEstadoValue(value || '');
 
   const buildResumen = (items: PostulacionAdminListItem[]) => {
     let cumple = 0;
@@ -184,9 +214,24 @@ export function GestionPostulaciones({
     items.forEach((item) => {
       const estado = normalizeEstado(item.estado ?? '');
       if (!estado) return;
-      if (estado.includes('no') && estado.includes('cumple')) {
+      if (estado === 'no cumple') {
         noCumple += 1;
-      } else if (estado.includes('cumple')) {
+      } else if (estado === 'cumple') {
+        cumple += 1;
+      }
+    });
+    return { total: items.length, cumple, noCumple };
+  };
+
+  const buildResumenFromMapped = (items: Postulacion[]) => {
+    let cumple = 0;
+    let noCumple = 0;
+    items.forEach((item) => {
+      const estado = normalizeEstado(item.estado ?? '');
+      if (!estado) return;
+      if (estado === 'no cumple') {
+        noCumple += 1;
+      } else if (estado === 'cumple') {
         cumple += 1;
       }
     });
@@ -268,6 +313,14 @@ export function GestionPostulaciones({
       filtered = filtered.filter((p) => p.estado === postFilters.estadoPostulacion);
     }
 
+    if (postFilters.anio) {
+      filtered = filtered.filter((p) => {
+        if (!p.fechaPostulacion) return false;
+        const match = String(p.fechaPostulacion).match(/\b(\d{4})\b/);
+        return match ? match[1] === postFilters.anio : false;
+      });
+    }
+
     setFilteredPostulaciones(filtered);
   };
 
@@ -298,15 +351,21 @@ export function GestionPostulaciones({
     setShowDetalle(true);
   };
 
-  const handleActualizarEstado = (postulacionId: string, nuevoEstado: string) => {
+  const handleActualizarEstado = (postulacionId: string, nuevoEstado: string, observacion: string) => {
     const updated = postulaciones.map((p) =>
-      p.id === postulacionId ? { ...p, estado: nuevoEstado } : p,
+      p.id === postulacionId ? { ...p, estado: nuevoEstado, observacion } : p,
     );
     setPostulaciones(updated);
     setFilteredPostulaciones(updated);
 
     if (selectedPostulacion && selectedPostulacion.id === postulacionId) {
-      setSelectedPostulacion({ ...selectedPostulacion, estado: nuevoEstado });
+      setSelectedPostulacion({ ...selectedPostulacion, estado: nuevoEstado, observacion });
+    }
+    if (selectedServicioId) {
+      setResumenByConv((prev) => ({
+        ...prev,
+        [selectedServicioId]: buildResumenFromMapped(updated),
+      }));
     }
   };
 
@@ -330,10 +389,13 @@ export function GestionPostulaciones({
   };
 
   const getEstadoBadge = (estado: string) => {
-    switch (estado) {
+    const normalized = normalizeEstado(estado);
+    switch (normalized) {
+      case 'registrado':
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Registrado</Badge>;
       case 'cumple':
         return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Cumple</Badge>;
-      case 'no-cumple':
+      case 'no cumple':
         return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">No cumple</Badge>;
       default:
         return <Badge variant="secondary">{estado}</Badge>;
@@ -344,6 +406,7 @@ export function GestionPostulaciones({
     return (
       <DetallePostulacionAdmin
         postulacion={selectedPostulacion}
+        adminUserId={adminUserId}
         onClose={() => {
           setShowDetalle(false);
           setSelectedPostulacion(null);
@@ -461,6 +524,7 @@ export function GestionPostulaciones({
                     <TableHead className="font-semibold">Servicio</TableHead>
                     <TableHead className="font-semibold">Categoría</TableHead>
                     <TableHead className="font-semibold">Oficina de Coordinación</TableHead>
+                    <TableHead className="font-semibold">Oficina Zonal</TableHead>
                     <TableHead className="font-semibold text-center">Inscritos</TableHead>
                     <TableHead className="font-semibold text-center">Cumple</TableHead>
                     <TableHead className="font-semibold text-center">No cumple</TableHead>
@@ -470,7 +534,7 @@ export function GestionPostulaciones({
                 <TableBody>
                   {filteredServicios.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-sm text-gray-500 py-6">
+                      <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-6">
                         No se encontraron servicios.
                       </TableCell>
                     </TableRow>
@@ -489,6 +553,7 @@ export function GestionPostulaciones({
                             </span>
                           </TableCell>
                           <TableCell>{servicio.oficinaCoordinacion || '-'}</TableCell>
+                          <TableCell>{servicio.oficinaZonal || '-'}</TableCell>
                           <TableCell className="text-center">
                             {isResumenLoading ? '...' : resumen?.total ?? 0}
                           </TableCell>
@@ -630,8 +695,37 @@ export function GestionPostulaciones({
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-gray-50 text-gray-700"
                     >
                       <option value="">Seleccionar...</option>
+                      <option value="registrado">Registrado</option>
                       <option value="cumple">Cumple</option>
-                      <option value="no-cumple">No cumple</option>
+                      <option value="no cumple">No cumple</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Año de registro
+                    </label>
+                    <select
+                      value={postFilters.anio}
+                      onChange={(e) => setPostFilters({ ...postFilters, anio: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-gray-50 text-gray-700"
+                    >
+                      <option value="">Todos</option>
+                      {Array.from(
+                        new Set(
+                          postulaciones
+                            .map((p) => {
+                              const match = String(p.fechaPostulacion ?? '').match(/\b(\d{4})\b/);
+                              return match ? match[1] : '';
+                            })
+                            .filter(Boolean),
+                        ),
+                      )
+                        .sort()
+                        .map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
                     </select>
                   </div>
                 </div>
@@ -676,7 +770,7 @@ export function GestionPostulaciones({
             <Card className="p-4 bg-gray-50 border-gray-200">
               <p className="text-sm font-semibold text-gray-700">No cumple</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {filteredPostulaciones.filter((p) => p.estado === 'no-cumple').length}
+                {filteredPostulaciones.filter((p) => p.estado === 'no cumple').length}
               </p>
             </Card>
           </div>
@@ -694,38 +788,39 @@ export function GestionPostulaciones({
 
               <div className="border rounded-lg overflow-hidden">
                 <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold">Persona</TableHead>
-                      <TableHead className="font-semibold">DNI</TableHead>
-                      <TableHead className="font-semibold">Servicio</TableHead>
-                      <TableHead className="font-semibold">Oficina de Coordinación</TableHead>
-                      <TableHead className="font-semibold">Categoría</TableHead>
-                      <TableHead className="font-semibold">Fecha</TableHead>
-                      <TableHead className="font-semibold">Estado</TableHead>
-                      <TableHead className="font-semibold text-center">Acciones</TableHead>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold">Persona</TableHead>
+                    <TableHead className="font-semibold">DNI</TableHead>
+                    <TableHead className="font-semibold">Servicio</TableHead>
+                    <TableHead className="font-semibold">Oficina Zonal</TableHead>
+                    <TableHead className="font-semibold">Oficina de Coordinación</TableHead>
+                    <TableHead className="font-semibold">Categoría</TableHead>
+                    <TableHead className="font-semibold">Fecha</TableHead>
+                    <TableHead className="font-semibold">Estado</TableHead>
+                    <TableHead className="font-semibold text-center">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-sm text-gray-500 py-6">
+                        Cargando registros...
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-6">
-                          Cargando registros...
-                        </TableCell>
-                      </TableRow>
-                    ) : loadError ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-sm text-red-600 py-6">
-                          {loadError}
-                        </TableCell>
-                      </TableRow>
-                    ) : filteredPostulaciones.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-6">
-                          No se encontraron registros.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
+                  ) : loadError ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-sm text-red-600 py-6">
+                        {loadError}
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredPostulaciones.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-sm text-gray-500 py-6">
+                        No se encontraron registros.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
                       filteredPostulaciones.map((postulacion) => (
                         <TableRow key={postulacion.id} className="hover:bg-gray-50">
                           <TableCell className="font-medium">{postulacion.postulante.nombre}</TableCell>
@@ -733,6 +828,7 @@ export function GestionPostulaciones({
                           <TableCell className="max-w-xs">
                             <div className="truncate">{postulacion.convocatoria}</div>
                           </TableCell>
+                          <TableCell>{postulacion.oficinaZonal || '-'}</TableCell>
                           <TableCell>
                             {postulacion.oficinaCoordinacion || postulacion.oficinaZonal}
                           </TableCell>

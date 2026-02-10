@@ -1,4 +1,4 @@
-import { FileText, Briefcase, Send, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+﻿import { FileText, Briefcase, Send, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import devidaLogo from '../../images/devida-logo.png';
 
@@ -23,16 +23,18 @@ export function Sidebar({
   onToggleCollapse,
   user,
 }: SidebarProps) {
+  const safeTrim = (value?: string | null) => (value ?? '').trim();
+
   const getInitials = () => {
     if (!user) return 'U';
-    const firstName = user.nombres.trim().split(' ')[0] || '';
-    const lastName = user.apellidoPaterno.trim().split(' ')[0] || '';
+    const firstName = safeTrim(user.nombres).split(' ')[0] || '';
+    const lastName = safeTrim(user.apellidoPaterno).split(' ')[0] || '';
     const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
     return initials || 'U';
   };
 
   const displayName = user
-    ? `${user.nombres.trim().split(' ')[0] || ''} ${user.apellidoPaterno}`.trim()
+    ? `${safeTrim(user.nombres).split(' ')[0] || ''} ${safeTrim(user.apellidoPaterno)}`.trim()
     : 'Usuario';
   const displayEmail = user?.email || 'usuario@ejemplo.com';
 
@@ -157,7 +159,7 @@ export function Sidebar({
               text-gray-500 hover:text-gray-900 flex-shrink-0
               ${collapsed ? 'hidden' : ''}
             `}
-            title="Cerrar sesión"
+            title="Cerrar sesion"
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -168,7 +170,7 @@ export function Sidebar({
           <button
             onClick={onLogout}
             className="w-full mt-2 p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-center"
-            title="Cerrar sesión"
+            title="Cerrar sesion"
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -177,3 +179,4 @@ export function Sidebar({
     </aside>
   );
 }
+
