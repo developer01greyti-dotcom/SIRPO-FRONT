@@ -418,6 +418,24 @@ export function VistaPrevia({
   const cursos = cursosProp ?? cursosState;
   const experiencias = experienciasProp ?? experienciasState;
   const declaraciones = declaracionesProp ?? declaracionesState;
+  const totalExperiencia = (() => {
+    let totalDays = 0;
+    experiencias.forEach((exp) => {
+      const start = parseFecha(exp.fechaInicio);
+      if (!start) return;
+      const motivo = (exp.motivoCese || '').toLowerCase();
+      const end = motivo.includes('actual')
+        ? new Date()
+        : parseFecha(exp.fechaFin) ?? new Date();
+      if (end < start) return;
+      const diffDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+      totalDays += diffDays;
+    });
+    const years = Math.floor(totalDays / 365);
+    const months = Math.floor((totalDays % 365) / 30);
+    const days = totalDays % 30;
+    return { years, months, days, totalDays };
+  })();
   const hasPersonalData = Boolean(
     datosPersonales.nombres ||
       datosPersonales.apellidoPaterno ||
@@ -895,11 +913,18 @@ export function VistaPrevia({
 
       {/* Experiencia Profesional */}
       <Card className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-            <Briefcase className="w-5 h-5 text-teal-600" />
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-teal-600" />
+            </div>
+            <h4 className="text-lg font-bold" style={{ color: '#04a25c' }}>Experiencia Profesional</h4>
           </div>
-          <h4 className="text-lg font-bold" style={{ color: '#04a25c' }}>Experiencia Profesional</h4>
+          {totalExperiencia.totalDays > 0 && (
+            <p className="text-sm text-gray-700 whitespace-nowrap">
+              Total de experiencia: {totalExperiencia.years} años, {totalExperiencia.months} meses, {totalExperiencia.days} días
+            </p>
+          )}
         </div>
 
         {experiencias.length > 0 ? (
