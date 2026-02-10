@@ -55,6 +55,8 @@ export function ExperienciaForm({
   const [tipoExperiencia, setTipoExperiencia] = useState<string>(experiencia?.tipoExperienciaId || '');
   const [tipoEntidad, setTipoEntidad] = useState<string>(experiencia?.tipoEntidadId || '');
   const [motivoCese, setMotivoCese] = useState(experiencia?.motivoCeseId || '');
+  const [fechaInicioValue, setFechaInicioValue] = useState(experiencia?.fechaInicio || '');
+  const [fechaFinValue, setFechaFinValue] = useState(experiencia?.fechaFin || '');
   const [distritoValue, setDistritoValue] = useState<string>(experiencia?.distritoId || '');
   const [ubigeoQuery, setUbigeoQuery] = useState<string>(experiencia?.distritoDescripcion || '');
   const [ubigeoOptions, setUbigeoOptions] = useState<DropdownItem[]>([]);
@@ -182,6 +184,8 @@ export function ExperienciaForm({
       setDocumentoEliminado(false);
       setSaveMessage(null);
       setSaveMessageType(null);
+      setFechaInicioValue('');
+      setFechaFinValue('');
       return;
     }
 
@@ -204,6 +208,8 @@ export function ExperienciaForm({
     setDocumentoEliminado(false);
     setSaveMessage(null);
     setSaveMessageType(null);
+    setFechaInicioValue(experiencia?.fechaInicio || '');
+    setFechaFinValue(experiencia?.fechaFin || '');
   }, [modo, experiencia, tipoExperienciaOptions, tipoEntidadOptions, motivoCeseOptions]);
 
   const handleDocumentoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -250,8 +256,8 @@ export function ExperienciaForm({
       cargo: formData.get('cargo') as string,
       funcionesPrincipales: formData.get('funcionesPrincipales') as string,
       motivoCese: motivoCese,
-      fechaInicio: formData.get('fechaInicio') as string,
-      fechaFin: formData.get('fechaFin') as string,
+      fechaInicio: fechaInicioValue,
+      fechaFin: isActualidad ? '' : fechaFinValue,
       certificadoPreview: certificadoPreview,
     };
 
@@ -271,17 +277,6 @@ export function ExperienciaForm({
       today.setHours(0, 0, 0, 0);
       if (!Number.isNaN(start.getTime()) && start > today) {
         setSaveMessage('La fecha inicio no puede ser mayor a la fecha actual.');
-        setSaveMessageType('error');
-        return;
-      }
-    }
-
-    if (!isActualidad && nuevaExperiencia.fechaFin) {
-      const end = new Date(nuevaExperiencia.fechaFin);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (!Number.isNaN(end.getTime()) && end > today) {
-        setSaveMessage('La fecha fin no puede ser mayor a la fecha actual.');
         setSaveMessageType('error');
         return;
       }
@@ -579,12 +574,13 @@ export function ExperienciaForm({
           {/* Fecha inicio */}
           <div className="space-y-2">
             <Label htmlFor="fechaInicio">Fecha inicio</Label>
-            <Input
+          <Input
               id="fechaInicio"
               name="fechaInicio"
               type="date"
               lang="es-PE"
-              defaultValue={experiencia?.fechaInicio || ''}
+              value={fechaInicioValue}
+              onChange={(e) => setFechaInicioValue(e.target.value)}
               max={todayIso}
             />
           </div>
@@ -598,8 +594,9 @@ export function ExperienciaForm({
                 name="fechaFin"
                 type="date"
                 lang="es-PE"
-                defaultValue={experiencia?.fechaFin || ''}
-                max={todayIso}
+                value={fechaFinValue}
+                onChange={(e) => setFechaFinValue(e.target.value)}
+                min={fechaInicioValue || undefined}
               />
             </div>
           )}

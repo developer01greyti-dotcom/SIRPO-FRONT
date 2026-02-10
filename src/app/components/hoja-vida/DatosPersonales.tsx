@@ -663,11 +663,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
 
   const buildFileUrl = (guid: string) => {
-
     const params = new URLSearchParams({ guid });
-
     return `${apiBaseUrl}/hv_ref_archivo/file?${params.toString()}`;
-
   };
 
 
