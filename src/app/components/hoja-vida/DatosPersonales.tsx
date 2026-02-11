@@ -218,6 +218,27 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     }
   };
 
+  const validateRequiredFields = () => {
+    const requiredFields: Array<[keyof DatosPersonalesForm, string]> = [
+      ['tipoDocumento', 'Tipo de documento'],
+      ['numeroDocumento', 'Nro. de documento'],
+      ['nombres', 'Nombres'],
+      ['apellidoPaterno', 'Apellido paterno'],
+      ['apellidoMaterno', 'Apellido materno'],
+      ['sexo', 'Sexo'],
+      ['estadoCivil', 'Estado civil'],
+      ['fechaNacimiento', 'Fecha nacimiento'],
+      ['nacionalidad', 'Nacionalidad'],
+      ['correo', 'Correo electrónico principal'],
+      ['telefonoCelular', 'Celular'],
+      ['cciBn', 'CCI-Banco de la Nación'],
+    ];
+
+    return requiredFields
+      .filter(([field]) => !String(formData[field] || '').trim())
+      .map(([, label]) => label);
+  };
+
 
 
   const authDefaults = useMemo<DatosPersonalesForm>(() => {
@@ -790,6 +811,13 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
       return;
 
+    }
+
+    const missingRequired = validateRequiredFields();
+    if (missingRequired.length > 0) {
+      setSaveMessage(`Complete los campos obligatorios: ${missingRequired.join(', ')}.`);
+      setSaveMessageType('error');
+      return;
     }
 
     setIsSaving(true);
@@ -1525,7 +1553,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2">
 
-              <Label htmlFor="correoSecundario">Correo electrónico secundario *</Label>
+              <Label htmlFor="correoSecundario">Correo electrónico secundario</Label>
 
               <div className="relative">
 

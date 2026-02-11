@@ -67,10 +67,38 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
     e.preventDefault();
     setFormError('');
     const formData = new FormData(e.target as HTMLFormElement);
-    const email = (formData.get('email') as string) || '';
-    const confirmarCorreo = (formData.get('confirmarCorreo') as string) || '';
+    const email = ((formData.get('email') as string) || '').trim();
+    const confirmarCorreo = ((formData.get('confirmarCorreo') as string) || '').trim();
     const password = (formData.get('password') as string) || '';
     const confirmarPassword = (formData.get('confirmarPassword') as string) || '';
+    const numeroDocumentoValue =
+      ((formData.get('numeroDocumento') as string) || numeroDocumento || '').trim();
+    const nombresValue = ((formData.get('nombres') as string) || nombres || '').trim();
+    const apellidoPaternoValue =
+      ((formData.get('apellidoPaterno') as string) || apellidoPaterno || '').trim();
+    const apellidoMaternoValue =
+      ((formData.get('apellidoMaterno') as string) || apellidoMaterno || '').trim();
+
+    const requiredFields: Array<[string, string]> = [
+      ['Tipo de documento', String(tipoDocumento || '').trim()],
+      ['Número de documento', numeroDocumentoValue],
+      ['Nombres', nombresValue],
+      ['Apellido paterno', apellidoPaternoValue],
+      ['Apellido materno', apellidoMaternoValue],
+      ['Correo electrónico', email],
+      ['Confirmar correo', confirmarCorreo],
+      ['Contraseña', String(password || '').trim()],
+      ['Confirmar contraseña', String(confirmarPassword || '').trim()],
+    ];
+
+    const missing = requiredFields
+      .filter(([, value]) => !value)
+      .map(([label]) => label);
+
+    if (missing.length > 0) {
+      setFormError(`Complete los campos obligatorios: ${missing.join(', ')}.`);
+      return;
+    }
 
     if (email.trim() !== confirmarCorreo.trim()) {
       setFormError('El correo y su confirmación no coinciden.');
@@ -82,18 +110,13 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
       return;
     }
 
-    if (!tipoDocumento) {
-      setFormError('Seleccione un tipo de documento.');
-      return;
-    }
-
     const payload = {
       tipoDocumento,
-      numeroDocumento: (formData.get('numeroDocumento') as string) || numeroDocumento,
-      apellidoPaterno: (formData.get('apellidoPaterno') as string) || apellidoPaterno,
-      apellidoMaterno: (formData.get('apellidoMaterno') as string) || apellidoMaterno,
-      nombres: (formData.get('nombres') as string) || nombres,
-      email: email.trim(),
+      numeroDocumento: numeroDocumentoValue,
+      apellidoPaterno: apellidoPaternoValue,
+      apellidoMaterno: apellidoMaternoValue,
+      nombres: nombresValue,
+      email,
       password,
     };
 

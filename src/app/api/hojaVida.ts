@@ -348,6 +348,17 @@ export const fetchHvCurList = async (
   return Array.isArray(data) ? data : data ? [data] : [];
 };
 
+export const downloadHojaVidaPdf = async (idHojaVida: number): Promise<Blob> => {
+  const response = await apiClient.get('/hv_pdf', {
+    params: { idHojaVida },
+    responseType: 'blob',
+    headers: {
+      Accept: 'application/pdf',
+    },
+  });
+  return response.data as Blob;
+};
+
 export const fetchHvExpList = async (
   idHojaVida: number,
 ): Promise<any[]> => {
@@ -400,13 +411,32 @@ export const deleteHvDecl = async (
 export const upsertHojaVidaDatos = async (
   payload: HojaVidaDatosPayload,
 ): Promise<number> => {
-  const response = await apiClient.post<any>('/hv_datos_upsert/list', {
-    estructura: payload,
-  });
-  const data = response.data;
-  const normalized = Array.isArray(data) ? data[0] : data;
-  const idHvDatos = normalized?.idHvDatos ?? normalized?.id ?? 0;
-  return Number(idHvDatos) || 0;
+  const requestBody = { estructura: payload };
+  try {
+    const response = await apiClient.post<any>('/hv_datos_upsert/list', requestBody);
+    const data = response.data;
+    const normalized = Array.isArray(data) ? data[0] : data;
+    const idHvDatos = normalized?.idHvDatos ?? normalized?.id ?? 0;
+    return Number(idHvDatos) || 0;
+  } catch (error: any) {
+    const rawData = error?.response?.data;
+    const message =
+      typeof rawData === 'string' ? rawData : rawData ? JSON.stringify(rawData) : '';
+    const shouldRetryLegacy =
+      message.includes('PLS-00306') || message.includes('ORA-06550');
+
+    if (shouldRetryLegacy && Object.prototype.hasOwnProperty.call(payload, 'correoSecundario')) {
+      const { correoSecundario, ...legacyPayload } = payload;
+      const fallback = await apiClient.post<any>('/hv_datos_upsert/list', {
+        estructura: legacyPayload,
+      });
+      const data = fallback.data;
+      const normalized = Array.isArray(data) ? data[0] : data;
+      const idHvDatos = normalized?.idHvDatos ?? normalized?.id ?? 0;
+      return Number(idHvDatos) || 0;
+    }
+    throw error;
+  }
 };
 
 export const saveHojaVidaDatos = async (

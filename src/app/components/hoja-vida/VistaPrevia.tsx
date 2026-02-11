@@ -4,7 +4,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
 import type { LoginResponse } from '../../api/auth';
-import { fetchHojaVidaActual, fetchHojaVidaDatos, fetchHvCurList, fetchHvDeclList, fetchHvExpList, fetchHvFormList, updateHojaVidaEstado, type HojaVidaActual } from '../../api/hojaVida'; 
+import { downloadHojaVidaPdf, fetchHojaVidaActual, fetchHojaVidaDatos, fetchHvCurList, fetchHvDeclList, fetchHvExpList, fetchHvFormList, updateHojaVidaEstado, type HojaVidaActual } from '../../api/hojaVida'; 
 import { PAISES_CATALOGO } from '../../data/paises';
 
 interface Formacion {
@@ -119,6 +119,7 @@ export function VistaPrevia({
   const [completionError, setCompletionError] = useState<string | null>(null); 
   const [loadError, setLoadError] = useState<string | null>(null); 
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   // Helper function para mostrar valores o placeholder
   const displayValue = (value: string | undefined, placeholder = 'Sin información') => {
     return value || placeholder;
@@ -493,12 +494,40 @@ export function VistaPrevia({
       setDownloadError('La vista previa esta cargando, intenta nuevamente.');
       return;
     }
+    if (isDownloading) {
+      return;
+    }
     if (!canDownload) {
       setDownloadError('No hay informacion disponible para descargar.');
       return;
     }
+    if (!hojaVidaActual?.idHojaVida) {
+      setDownloadError('No se encontró la Hoja de Vida para descargar.');
+      return;
+    }
     setDownloadError(null);
-    window.print();
+    setIsDownloading(true);
+    downloadHojaVidaPdf(hojaVidaActual.idHojaVida)
+      .then((blob) => {
+        if (!blob || blob.size === 0) {
+          setDownloadError('No se pudo generar el PDF.');
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const doc = datosPersonales.numeroDocumento?.trim();
+        const filename = doc ? `hoja_vida_${doc}.pdf` : `hoja_vida_${hojaVidaActual.idHojaVida}.pdf`;
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      })
+      .catch(() => {
+        setDownloadError('No se pudo descargar el PDF.');
+      })
+      .finally(() => {
+        setIsDownloading(false);
+      });
   };
 
   useEffect(() => {
@@ -551,10 +580,10 @@ export function VistaPrevia({
               <button
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleDownload}
-                disabled={isLoading}
+                disabled={isLoading || isDownloading}
               >
                 <Download className="w-3.5 h-3.5" />
-                Descargar
+                {isDownloading ? 'Descargando...' : 'Descargar'}
               </button>
             </div>
           </div>
