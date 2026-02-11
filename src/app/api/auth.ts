@@ -20,7 +20,28 @@ export interface RegisterResponse {
   tipoDocumento?: string;
   numeroDocumento?: string;
   ruc?: string;
+  token?: string;
 }
+
+const extractToken = (raw: any): string => {
+  if (!raw || typeof raw !== 'object') return '';
+  const candidates = [raw, raw?.data, raw?.resultado, raw?.result];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const token =
+      candidate.token ||
+      candidate.accessToken ||
+      candidate.jwt ||
+      candidate.bearer ||
+      candidate.bearerToken ||
+      candidate.token_access ||
+      candidate.tokenAccess;
+    if (typeof token === 'string' && token.trim()) {
+      return token.trim();
+    }
+  }
+  return '';
+};
 
 export const registerPostulante = async (
   payload: RegisterPayload,
@@ -30,7 +51,9 @@ export const registerPostulante = async (
       estructura: payload,
     });
     const data = response.data;
-    return Array.isArray(data) ? data[0] : data;
+    const normalized = Array.isArray(data) ? data[0] : data;
+    const token = extractToken(response.data);
+    return token ? { ...normalized, token } : normalized;
   };
 
   try {
@@ -59,6 +82,7 @@ export interface LoginResponse {
   tipoDocumento?: string;
   numeroDocumento?: string;
   ruc?: string;
+  token?: string;
 }
 
 export const loginPostulante = async (
@@ -71,5 +95,7 @@ export const loginPostulante = async (
     },
   );
   const data = response.data;
-  return Array.isArray(data) ? data[0] : data;
+  const normalized = Array.isArray(data) ? data[0] : data;
+  const token = extractToken(response.data);
+  return token ? { ...normalized, token } : normalized;
 };

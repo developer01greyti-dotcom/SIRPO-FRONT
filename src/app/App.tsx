@@ -159,6 +159,120 @@ export interface ExperienciaProfesionalData {
   }>;
 }
 
+const STORAGE_KEYS = {
+  userType: 'sirpo.userType',
+  postulanteUser: 'sirpo.postulanteUser',
+  adminAuth: 'sirpo.adminAuth',
+  authToken: 'sirpo.authToken',
+  remember: 'sirpo.remember',
+  activeSection: 'sirpo.activeSection',
+  activeTab: 'sirpo.activeTab',
+  adminSection: 'sirpo.adminSection',
+};
+
+type StoredAdminAuth = {
+  role: 'gestor' | 'superadmin';
+  userName: string;
+  userId: number;
+  token?: string;
+};
+
+const safeParse = <T,>(raw: string | null, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const getStoredValue = (key: string) => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(key) ?? sessionStorage.getItem(key);
+};
+
+const setStoredValue = (key: string, value: string, remember: boolean) => {
+  if (typeof window === 'undefined') return;
+  if (remember) {
+    localStorage.setItem(key, value);
+    sessionStorage.removeItem(key);
+  } else {
+    sessionStorage.setItem(key, value);
+    localStorage.removeItem(key);
+  }
+};
+
+const removeStoredValue = (key: string) => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(key);
+  sessionStorage.removeItem(key);
+};
+
+const isRememberEnabled = () => {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(STORAGE_KEYS.remember) === '1';
+};
+
+const loadStoredAuthState = () => {
+  if (typeof window === 'undefined') {
+    return {
+      userType: null as 'postulante' | 'admin' | null,
+      postulanteUser: null as LoginResponse | null,
+      adminAuth: null as StoredAdminAuth | null,
+      authToken: '',
+      activeSection: null as string | null,
+      activeTab: null as string | null,
+      adminSection: null as string | null,
+      isAuthenticated: false,
+    };
+  }
+  const storedUserType = getStoredValue(STORAGE_KEYS.userType);
+  const userType = (storedUserType as
+    | 'postulante'
+    | 'admin'
+    | null) ?? null;
+  const postulanteUser = safeParse<LoginResponse | null>(
+    getStoredValue(STORAGE_KEYS.postulanteUser),
+    null,
+  );
+  const adminAuth = safeParse<StoredAdminAuth | null>(
+    getStoredValue(STORAGE_KEYS.adminAuth),
+    null,
+  );
+  const authToken = getStoredValue(STORAGE_KEYS.authToken) || '';
+  const activeSection = getStoredValue(STORAGE_KEYS.activeSection);
+  const activeTab = getStoredValue(STORAGE_KEYS.activeTab);
+  const adminSection = getStoredValue(STORAGE_KEYS.adminSection);
+  const isAuthenticated =
+    userType === 'postulante'
+      ? Boolean(postulanteUser?.idUsuario)
+      : userType === 'admin'
+      ? Boolean(adminAuth?.userId)
+      : false;
+  return {
+    userType,
+    postulanteUser,
+    adminAuth,
+    authToken,
+    activeSection,
+    activeTab,
+    adminSection,
+    isAuthenticated,
+  };
+};
+
+const clearAuthStorage = () => {
+  if (typeof window === 'undefined') return;
+  removeStoredValue(STORAGE_KEYS.userType);
+  removeStoredValue(STORAGE_KEYS.postulanteUser);
+  removeStoredValue(STORAGE_KEYS.adminAuth);
+  removeStoredValue(STORAGE_KEYS.authToken);
+  removeStoredValue(STORAGE_KEYS.activeSection);
+  removeStoredValue(STORAGE_KEYS.activeTab);
+  removeStoredValue(STORAGE_KEYS.adminSection);
+  localStorage.removeItem(STORAGE_KEYS.remember);
+};
+
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -174,13 +288,22 @@ export default function App() {
     : initialPath === '/recuperarContrasena'
     ? 'recovery'
     : 'login';
+  const storedAuth = loadStoredAuthState();
   // Estado para definir si es usuario normal o admin
-  const [userType, setUserType] = useState<'postulante' | 'admin' | null>(initialUserType);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [postulanteUser, setPostulanteUser] = useState<LoginResponse | null>(null);
+  const [userType, setUserType] = useState<'postulante' | 'admin' | null>(
+    storedAuth.userType ?? initialUserType,
+  );
+  const [isAuthenticated, setIsAuthenticated] = useState(storedAuth.isAuthenticated);
+  const [postulanteUser, setPostulanteUser] = useState<LoginResponse | null>(
+    storedAuth.postulanteUser,
+  );
   const [authView, setAuthView] = useState<'login' | 'register' | 'recovery'>(initialAuthView);
-  const [activeSection, setActiveSection] = useState('hoja-vida');
-  const [activeTab, setActiveTab] = useState('datos-personales');
+  const [activeSection, setActiveSection] = useState(
+    storedAuth.activeSection || 'hoja-vida',
+  );
+  const [activeTab, setActiveTab] = useState(
+    storedAuth.activeTab || 'datos-personales',
+  );
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [filteredConvocatorias, setFilteredConvocatorias] = useState<Convocatoria[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -202,10 +325,52 @@ export default function App() {
   const [showDetallePostulacion, setShowDetallePostulacion] = useState(false);
 
   // Estados para admin
-  const [adminSection, setAdminSection] = useState('registros');
-  const [adminRole, setAdminRole] = useState<'gestor' | 'superadmin' | null>(null);
-  const [adminUserName, setAdminUserName] = useState<string>('');
-  const [adminUserId, setAdminUserId] = useState<number>(0);
+  const [adminSection, setAdminSection] = useState(
+    storedAuth.adminSection || 'registros',
+  );
+  const [adminRole, setAdminRole] = useState<'gestor' | 'superadmin' | null>(
+    storedAuth.adminAuth?.role ?? null,
+  );
+  const [adminUserName, setAdminUserName] = useState<string>(
+    storedAuth.adminAuth?.userName ?? '',
+  );
+  const [adminUserId, setAdminUserId] = useState<number>(
+    storedAuth.adminAuth?.userId ?? 0,
+  );
+
+  const persistPostulanteAuth = (user: LoginResponse, remember: boolean) => {
+    if (typeof window === 'undefined') return;
+    setStoredValue(STORAGE_KEYS.userType, 'postulante', remember);
+    setStoredValue(STORAGE_KEYS.postulanteUser, JSON.stringify(user), remember);
+    if (user?.token) {
+      setStoredValue(STORAGE_KEYS.authToken, user.token, remember);
+    } else {
+      removeStoredValue(STORAGE_KEYS.authToken);
+    }
+    if (remember) {
+      localStorage.setItem(STORAGE_KEYS.remember, '1');
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.remember);
+    }
+  };
+
+  const persistAdminAuth = (
+    role: 'gestor' | 'superadmin',
+    userName: string,
+    userId: number,
+    token?: string,
+  ) => {
+    if (typeof window === 'undefined') return;
+    const payload: StoredAdminAuth = { role, userName, userId, token };
+    setStoredValue(STORAGE_KEYS.userType, 'admin', true);
+    setStoredValue(STORAGE_KEYS.adminAuth, JSON.stringify(payload), true);
+    if (token) {
+      setStoredValue(STORAGE_KEYS.authToken, token, true);
+    } else {
+      removeStoredValue(STORAGE_KEYS.authToken);
+    }
+    localStorage.setItem(STORAGE_KEYS.remember, '1');
+  };
 
   useEffect(() => {
     const path = location.pathname || '/login';
@@ -285,6 +450,29 @@ export default function App() {
     } 
   }, [location.pathname, isAuthenticated, userType, navigate]); 
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (userType === 'postulante') {
+      const remember = isRememberEnabled();
+      setStoredValue(STORAGE_KEYS.activeSection, activeSection, remember);
+    }
+  }, [activeSection, userType]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (userType === 'postulante') {
+      const remember = isRememberEnabled();
+      setStoredValue(STORAGE_KEYS.activeTab, activeTab, remember);
+    }
+  }, [activeTab, userType]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (userType === 'admin') {
+      setStoredValue(STORAGE_KEYS.adminSection, adminSection, true);
+    }
+  }, [adminSection, userType]);
+
   // Estados para Hoja de Vida
   const [datosPersonales, setDatosPersonales] = useState<DatosPersonalesData>({
     tipoDocumento: '',
@@ -321,10 +509,11 @@ export default function App() {
   });
 
   // Auth handlers
-  const handleLogin = (user: LoginResponse) => {
+  const handleLogin = (user: LoginResponse, remember = true) => {
     setPostulanteUser(user);
     setIsAuthenticated(true);
     setUserType('postulante');
+    persistPostulanteAuth(user, remember);
     navigate('/hojaVida', { replace: true });
   };
 
@@ -332,6 +521,7 @@ export default function App() {
     setPostulanteUser(user);
     setIsAuthenticated(true);
     setUserType('postulante');
+    persistPostulanteAuth(user, true);
     navigate('/hojaVida', { replace: true });
   };
 
@@ -341,15 +531,22 @@ export default function App() {
     setActiveSection('hoja-vida');
     setPostulanteUser(null);
     setHojaVidaId(0);
+    clearAuthStorage();
     navigate('/login', { replace: true });
   };
 
-  const handleAdminLogin = (role: 'gestor' | 'superadmin', username: string, adminId: number) => {
+  const handleAdminLogin = (
+    role: 'gestor' | 'superadmin',
+    username: string,
+    adminId: number,
+    token?: string,
+  ) => {
     setAdminRole(role);
     setAdminUserName(username);
     setAdminUserId(adminId);
     setIsAuthenticated(true);
     setUserType('admin');
+    persistAdminAuth(role, username, adminId, token);
     navigate('/admin/registros', { replace: true });
   };
 
@@ -360,6 +557,7 @@ export default function App() {
     setAdminRole(null);
     setAdminUserName('');
     setAdminUserId(0);
+    clearAuthStorage();
     navigate('/admin/login', { replace: true });
   };
 
@@ -712,8 +910,8 @@ export default function App() {
     if (userType === 'admin') {
       return (
         <AdminLogin
-          onLogin={(role, username, adminId) => {
-            handleAdminLogin(role, username, adminId);
+          onLogin={(role, username, adminId, token) => {
+            handleAdminLogin(role, username, adminId, token);
           }}
         />
       );

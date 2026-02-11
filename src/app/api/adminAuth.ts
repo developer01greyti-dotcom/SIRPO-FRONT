@@ -8,7 +8,28 @@ export interface AdminLoginResponse {
   rol: string;
   rolId: number;
   email: string;
+  token?: string;
 }
+
+const extractToken = (raw: any): string => {
+  if (!raw || typeof raw !== 'object') return '';
+  const candidates = [raw, raw?.data, raw?.resultado, raw?.result];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const token =
+      candidate.token ||
+      candidate.accessToken ||
+      candidate.jwt ||
+      candidate.bearer ||
+      candidate.bearerToken ||
+      candidate.token_access ||
+      candidate.tokenAccess;
+    if (typeof token === 'string' && token.trim()) {
+      return token.trim();
+    }
+  }
+  return '';
+};
 
 const normalizeAdminResponse = (raw: any): AdminLoginResponse | null => {
   if (!raw) return null;
@@ -52,7 +73,8 @@ export const loginAdmin = async (
       const normalized = Array.isArray(data) ? data[0] : data;
       const parsed = normalizeAdminResponse(normalized);
       if (parsed) {
-        return parsed;
+        const token = extractToken(response.data);
+        return token ? { ...parsed, token } : parsed;
       }
       return null;
     } catch (error) {

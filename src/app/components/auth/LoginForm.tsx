@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { loginPostulante, type LoginResponse } from '../../api/auth';
 
 interface LoginFormProps {
-  onLogin: (user: LoginResponse) => void;
+  onLogin: (user: LoginResponse, remember: boolean) => void;
   onNavigateToRegister: () => void;
   onNavigateToRecovery: () => void;
 }
@@ -18,6 +18,7 @@ export function LoginForm({ onLogin, onNavigateToRegister, onNavigateToRecovery 
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [remember, setRemember] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -38,7 +39,7 @@ export function LoginForm({ onLogin, onNavigateToRegister, onNavigateToRecovery 
       if (!response?.idUsuario) {
         throw new Error('Respuesta de autenticación inválida.');
       }
-      onLogin(response);
+      onLogin(response, remember);
     } catch {
       setFormError('Credenciales inválidas o error del servidor.');
     } finally {
@@ -115,12 +116,16 @@ export function LoginForm({ onLogin, onNavigateToRegister, onNavigateToRecovery 
 
             {/* Remember and Forgot */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox id="remember" />
-                <label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer">
-                  Recordarme
-                </label>
-              </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="remember"
+                checked={remember}
+                onCheckedChange={(value) => setRemember(Boolean(value))}
+              />
+              <label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer">
+                Recordarme
+              </label>
+            </div>
               <button
                 type="button"
                 onClick={onNavigateToRecovery}

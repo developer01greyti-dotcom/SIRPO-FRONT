@@ -5,7 +5,7 @@ import { Card } from '../ui/card';
 import { loginAdmin } from '../../api/adminAuth';
 
 interface AdminLoginProps {
-  onLogin: (role: 'gestor' | 'superadmin', username: string, adminId: number) => void;
+  onLogin: (role: 'gestor' | 'superadmin', username: string, adminId: number, token?: string) => void;
 }
 
 export function AdminLogin({ onLogin }: AdminLoginProps) {
@@ -39,7 +39,7 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
       const normalizedRole =
         roleText.includes('super') || roleText.includes('admin') ? 'superadmin' : 'gestor';
       const displayName = result.nombreCompleto || result.usuario || formData.usuario;
-      onLogin(normalizedRole, displayName, Number(result.idAdmin));
+      onLogin(normalizedRole, displayName, Number(result.idAdmin), result.token);
     } catch (err) {
       setError('No se pudo iniciar sesión. Inténtalo nuevamente.');
     } finally {
