@@ -17,6 +17,7 @@ import {
 import { DetallePostulacionAdmin } from './DetallePostulacionAdmin';
 import { deleteConvocatoria } from '../../api/convocatorias';
 import { fetchPostulacionesByConvocatoria, type PostulacionAdminListItem } from '../../api/postulaciones';
+import { canDeleteServicios, canEvaluatePostulaciones, isCumpleOnlyRole, type AdminRole } from '../../utils/roles';
 
 interface ServicioItem {
   id: string;
@@ -32,6 +33,10 @@ interface Postulacion {
   idConvocatoria: string;
   idHojaVida: number;
   numeroPostulacion?: string;
+  contratoActivo?: boolean;
+  numeroContrato?: string;
+  oficinaZonalContrato?: string;
+  fechaFinContrato?: string;
   postulante: {
     nombre: string;
     documento: string;
@@ -49,6 +54,9 @@ interface Postulacion {
 interface GestionPostulacionesProps {
   convocatorias: any[];
   adminUserId?: number;
+  adminRole?: AdminRole;
+  adminOficinaZonalId?: number;
+  adminOficinaZonal?: string;
 }
 
 const defaultListFilters = {
@@ -69,7 +77,13 @@ const defaultPostFilters = {
 export function GestionPostulaciones({
   convocatorias,
   adminUserId = 0,
+  adminRole,
+  adminOficinaZonalId,
+  adminOficinaZonal,
 }: GestionPostulacionesProps) {
+  const cumpleOnly = isCumpleOnlyRole(adminRole);
+  const canEvaluar = canEvaluatePostulaciones(adminRole);
+  const canEliminarServicio = canDeleteServicios(adminRole);
   const [servicios, setServicios] = useState<ServicioItem[]>([]);
   const [listFilters, setListFilters] = useState(defaultListFilters);
   const [appliedListFilters, setAppliedListFilters] = useState(defaultListFilters);
@@ -96,9 +110,28 @@ export function GestionPostulaciones({
   >({});
   const [resumenLoadingIds, setResumenLoadingIds] = useState<string[]>([]);
 
+  const normalizeOz = (value?: string) => (value || '').trim().toUpperCase();
+  const matchesAdminOz = (item: any) => {
+    if (!adminOficinaZonalId && !adminOficinaZonal) return true;
+    const itemOzId = item?.idOficinaZonal ?? item?.id_oficina_zonal ?? item?.idZonal ?? '';
+    if (adminOficinaZonalId && String(itemOzId) === String(adminOficinaZonalId)) {
+      return true;
+    }
+    const itemOzName =
+      item?.oficinaZonal ??
+      item?.nombreOficinaZonal ??
+      (String(item?.oficinaCoordinacion ?? '').includes('/')
+        ? String(item?.oficinaCoordinacion ?? '').split('/')[0]?.trim()
+        : '');
+    if (adminOficinaZonal) {
+      return normalizeOz(itemOzName) === normalizeOz(adminOficinaZonal);
+    }
+    return false;
+  };
+
   useEffect(() => {
     const map = new Map<string, ServicioItem>();
-    (convocatorias || []).forEach((item: any) => {
+    (convocatorias || []).filter(matchesAdminOz).forEach((item: any) => {
       const id = String(item?.idConvocatoria ?? item?.id ?? '').trim();
       const nombre = String(item?.nombre ?? item?.titulo ?? '').trim();
       if (!id || !nombre) return;
@@ -118,7 +151,7 @@ export function GestionPostulaciones({
       }
     });
     setServicios(Array.from(map.values()));
-  }, [convocatorias]);
+  }, [convocatorias, adminOficinaZonalId, adminOficinaZonal]);
 
   const listOficinaOptions = useMemo(() => {
     const values = servicios
@@ -192,6 +225,10 @@ export function GestionPostulaciones({
     idConvocatoria: String(item.idConvocatoria ?? ''),
     idHojaVida: Number(item.idHojaVida ?? 0),
     numeroPostulacion: item.numeroPostulacion ?? '',
+    contratoActivo: item.contratoActivo ?? false,
+    numeroContrato: item.numeroContrato ?? '',
+    oficinaZonalContrato: item.oficinaZonalContrato ?? '',
+    fechaFinContrato: item.fechaFinContrato ?? '',
     postulante: {
       nombre: item.postulanteNombre ?? '',
       documento: item.postulanteDocumento ?? '',
@@ -220,6 +257,9 @@ export function GestionPostulaciones({
         cumple += 1;
       }
     });
+    if (cumpleOnly) {
+      return { total: cumple, cumple, noCumple: 0 };
+    }
     return { total: items.length, cumple, noCumple };
   };
 
@@ -235,6 +275,9 @@ export function GestionPostulaciones({
         cumple += 1;
       }
     });
+    if (cumpleOnly) {
+      return { total: cumple, cumple, noCumple: 0 };
+    }
     return { total: items.length, cumple, noCumple };
   };
   const loadResumen = async (idConvocatoria: string) => {
@@ -273,8 +316,11 @@ export function GestionPostulaciones({
     try {
       const data = await fetchPostulacionesByConvocatoria(Number(idConvocatoria));
       const mapped = data.map(mapPostulacion);
-      setPostulaciones(mapped);
-      setFilteredPostulaciones(mapped);
+      const roleFiltered = cumpleOnly
+        ? mapped.filter((item) => normalizeEstado(item.estado) === 'cumple')
+        : mapped;
+      setPostulaciones(roleFiltered);
+      setFilteredPostulaciones(roleFiltered);
     } catch (error) {
       setPostulaciones([]);
       setFilteredPostulaciones([]);
@@ -321,12 +367,23 @@ export function GestionPostulaciones({
       });
     }
 
+    if (cumpleOnly) {
+      filtered = filtered.filter((p) => normalizeEstado(p.estado) === 'cumple');
+    }
+
     setFilteredPostulaciones(filtered);
   };
 
   const handleClearPostFilters = () => {
-    setPostFilters(defaultPostFilters);
-    setFilteredPostulaciones(postulaciones);
+    const nextFilters = cumpleOnly
+      ? { ...defaultPostFilters, estadoPostulacion: 'cumple' }
+      : defaultPostFilters;
+    setPostFilters(nextFilters);
+    setFilteredPostulaciones(
+      cumpleOnly
+        ? postulaciones.filter((p) => normalizeEstado(p.estado) === 'cumple')
+        : postulaciones,
+    );
   };
 
   const handleSearchServicios = () => {
@@ -342,7 +399,9 @@ export function GestionPostulaciones({
     setSelectedServicioId(servicio.id);
     setSelectedServicioNombre(servicio.nombre);
     setShowDetailFilters(true);
-    setPostFilters(defaultPostFilters);
+    setPostFilters(
+      cumpleOnly ? { ...defaultPostFilters, estadoPostulacion: 'cumple' } : defaultPostFilters,
+    );
     loadPostulaciones(servicio.id);
   };
 
@@ -402,11 +461,17 @@ export function GestionPostulaciones({
     }
   };
 
+  useEffect(() => {
+    if (!cumpleOnly) return;
+    setPostFilters((prev) => ({ ...prev, estadoPostulacion: 'cumple' }));
+  }, [cumpleOnly]);
+
   if (showDetalle && selectedPostulacion) {
     return (
       <DetallePostulacionAdmin
         postulacion={selectedPostulacion}
         adminUserId={adminUserId}
+        canEditEstado={canEvaluar}
         onClose={() => {
           setShowDetalle(false);
           setSelectedPostulacion(null);
@@ -527,14 +592,19 @@ export function GestionPostulaciones({
                     <TableHead className="font-semibold">Oficina Zonal</TableHead>
                     <TableHead className="font-semibold text-center">Inscritos</TableHead>
                     <TableHead className="font-semibold text-center">Cumple</TableHead>
-                    <TableHead className="font-semibold text-center">No cumple</TableHead>
+                    {!cumpleOnly && (
+                      <TableHead className="font-semibold text-center">No cumple</TableHead>
+                    )}
                     <TableHead className="font-semibold text-center">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredServicios.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-6">
+                      <TableCell
+                        colSpan={cumpleOnly ? 7 : 8}
+                        className="text-center text-sm text-gray-500 py-6"
+                      >
                         No se encontraron servicios.
                       </TableCell>
                     </TableRow>
@@ -560,9 +630,11 @@ export function GestionPostulaciones({
                           <TableCell className="text-center">
                             {isResumenLoading ? '...' : resumen?.cumple ?? 0}
                           </TableCell>
-                          <TableCell className="text-center">
-                            {isResumenLoading ? '...' : resumen?.noCumple ?? 0}
-                          </TableCell>
+                          {!cumpleOnly && (
+                            <TableCell className="text-center">
+                              {isResumenLoading ? '...' : resumen?.noCumple ?? 0}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <div className="flex items-center justify-center gap-2">
                               <Button
@@ -574,15 +646,17 @@ export function GestionPostulaciones({
                                 <Eye className="w-4 h-4" />
                                 Ver detalle
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEliminarServicio(servicio)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              {canEliminarServicio && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEliminarServicio(servicio)}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -685,21 +759,23 @@ export function GestionPostulaciones({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">
-                      Estado Registro
-                    </label>
-                    <select
-                      value={postFilters.estadoPostulacion}
-                      onChange={(e) => setPostFilters({ ...postFilters, estadoPostulacion: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-gray-50 text-gray-700"
-                    >
-                      <option value="">Seleccionar...</option>
-                      <option value="registrado">Registrado</option>
-                      <option value="cumple">Cumple</option>
-                      <option value="no cumple">No cumple</option>
-                    </select>
-                  </div>
+                  {!cumpleOnly && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">
+                        Estado Registro
+                      </label>
+                      <select
+                        value={postFilters.estadoPostulacion}
+                        onChange={(e) => setPostFilters({ ...postFilters, estadoPostulacion: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-gray-50 text-gray-700"
+                      >
+                        <option value="">Seleccionar...</option>
+                        <option value="registrado">Registrado</option>
+                        <option value="cumple">Cumple</option>
+                        <option value="no cumple">No cumple</option>
+                      </select>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-gray-700">
                       Año de registro
@@ -760,19 +836,21 @@ export function GestionPostulaciones({
             </Card>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`grid grid-cols-1 ${cumpleOnly ? '' : 'md:grid-cols-2'} gap-4`}>
             <Card className="p-4 bg-green-50 border-green-200">
               <p className="text-sm font-semibold text-green-700">Cumple</p>
               <p className="text-2xl font-bold text-green-900 mt-1">
                 {filteredPostulaciones.filter((p) => p.estado === 'cumple').length}
               </p>
             </Card>
-            <Card className="p-4 bg-gray-50 border-gray-200">
-              <p className="text-sm font-semibold text-gray-700">No cumple</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {filteredPostulaciones.filter((p) => p.estado === 'no cumple').length}
-              </p>
-            </Card>
+            {!cumpleOnly && (
+              <Card className="p-4 bg-gray-50 border-gray-200">
+                <p className="text-sm font-semibold text-gray-700">No cumple</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {filteredPostulaciones.filter((p) => p.estado === 'no cumple').length}
+                </p>
+              </Card>
+            )}
           </div>
 
           <Card className="p-6">

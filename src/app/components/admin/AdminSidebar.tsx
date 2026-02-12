@@ -1,12 +1,12 @@
 import { Users, Briefcase, Mail, LogOut, ChevronLeft, ChevronRight, Shield, User } from 'lucide-react';
-import { Button } from '../ui/button';
 import { useState } from 'react';
+import { getRoleLabel, type AdminRole } from '../../utils/roles';
 
 interface AdminSidebarProps {
   activeSection: string;
   onNavigate: (section: string) => void;
   onLogout: () => void;
-  userRole?: 'gestor' | 'superadmin' | null;
+  userRole?: AdminRole | null;
   userName?: string;
 }
 
@@ -20,16 +20,13 @@ export function AdminSidebar({
   const [collapsed, setCollapsed] = useState(false);
 
   const menuItems = [
-    { id: 'registros', icon: Users, label: 'Registros', roles: ['gestor', 'superadmin'] },
-    { id: 'servicios', icon: Briefcase, label: 'Servicios', roles: ['gestor', 'superadmin'] },
+    { id: 'registros', icon: Users, label: 'Registros', roles: ['gestor', 'superadmin', 'date', 'uaba'] },
+    { id: 'servicios', icon: Briefcase, label: 'Servicios', roles: ['gestor', 'superadmin', 'date', 'uaba'] },
     { id: 'plantillas', icon: Mail, label: 'Plantillas de Correo', roles: ['gestor', 'superadmin'] },
     { id: 'usuarios', icon: Shield, label: 'Gestión de Usuarios', roles: ['superadmin'] },
   ];
 
-  // Filtrar menú según rol
-  const filteredMenuItems = menuItems.filter(item => 
-    !userRole || item.roles.includes(userRole)
-  );
+  const filteredMenuItems = menuItems.filter((item) => !userRole || item.roles.includes(userRole));
 
   return (
     <aside
@@ -37,7 +34,6 @@ export function AdminSidebar({
         collapsed ? 'w-20' : 'w-64'
       }`}
     >
-      {/* Header */}
       <div className="p-4 border-b border-green-600">
         <div className="flex items-center justify-between">
           {!collapsed && (
@@ -55,7 +51,6 @@ export function AdminSidebar({
         </div>
       </div>
 
-      {/* Menu Items */}
       <nav className="flex-1 p-4 space-y-2">
         {filteredMenuItems.map((item) => {
           const Icon = item.icon;
@@ -79,26 +74,24 @@ export function AdminSidebar({
         })}
       </nav>
 
-      {/* User Info & Logout */}
       <div className="p-4 border-t border-green-600 space-y-2">
-        {/* User Info */}
         {userName && (
-          <div className={`flex items-center gap-3 px-4 py-2 rounded-lg bg-green-600/50 ${
-            collapsed ? 'justify-center' : ''
-          }`} title={collapsed ? userName : ''}>
+          <div
+            className={`flex items-center gap-3 px-4 py-2 rounded-lg bg-green-600/50 ${
+              collapsed ? 'justify-center' : ''
+            }`}
+            title={collapsed ? userName : ''}
+          >
             <User className="w-5 h-5 flex-shrink-0" />
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">{userName}</p>
-                <p className="text-xs text-green-200">
-                  {userRole === 'superadmin' ? 'Super Admin' : 'Gestor'}
-                </p>
+                <p className="text-xs text-green-200">{getRoleLabel(userRole)}</p>
               </div>
             )}
           </div>
         )}
-        
-        {/* Logout Button */}
+
         <button
           onClick={onLogout}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white hover:bg-red-600 transition-colors ${

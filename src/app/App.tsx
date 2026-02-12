@@ -34,6 +34,7 @@ import type { LoginResponse } from './api/auth';
 import { fetchConvocatoriasList } from './api/convocatorias';
 import { fetchHojaVidaActual } from './api/hojaVida';
 import { fetchPostulacionesByPersona, upsertPostulacion, type PostulacionListItem } from './api/postulaciones';
+import { mapTipoUsuarioToRole, type AdminRole } from './utils/roles';
 
 interface Convocatoria {
   id: string;
@@ -173,9 +174,11 @@ const STORAGE_KEYS = {
 };
 
 type StoredAdminAuth = {
-  role: 'gestor' | 'superadmin';
+  role: AdminRole;
   userName: string;
   userId: number;
+  oficinaZonalId?: number;
+  oficinaZonal?: string;
   token?: string;
 };
 
@@ -331,7 +334,7 @@ export default function App() {
   const [adminSection, setAdminSection] = useState(
     storedAuth.adminSection || 'registros',
   );
-  const [adminRole, setAdminRole] = useState<'gestor' | 'superadmin' | null>(
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(
     storedAuth.adminAuth?.role ?? null,
   );
   const [adminUserName, setAdminUserName] = useState<string>(
@@ -340,12 +343,28 @@ export default function App() {
   const [adminUserId, setAdminUserId] = useState<number>(
     storedAuth.adminAuth?.userId ?? 0,
   );
+  const [adminOficinaZonalId, setAdminOficinaZonalId] = useState<number>(
+    storedAuth.adminAuth?.oficinaZonalId ?? 0,
+  );
+  const [adminOficinaZonal, setAdminOficinaZonal] = useState<string>(
+    storedAuth.adminAuth?.oficinaZonal ?? '',
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const raw = sessionStorage.getItem('sirpo.toast');
     if (!raw) return;
     sessionStorage.removeItem('sirpo.toast');
+    const hasAuth =
+      Boolean(localStorage.getItem('sirpo.authToken')) ||
+      Boolean(sessionStorage.getItem('sirpo.authToken')) ||
+      Boolean(localStorage.getItem('sirpo.adminAuth')) ||
+      Boolean(sessionStorage.getItem('sirpo.adminAuth')) ||
+      Boolean(localStorage.getItem('sirpo.postulanteUser')) ||
+      Boolean(sessionStorage.getItem('sirpo.postulanteUser'));
+    if (!hasAuth) {
+      return;
+    }
     try {
       const parsed = JSON.parse(raw) as { type?: string; message?: string };
       const message = parsed?.message || '';
@@ -380,13 +399,15 @@ export default function App() {
   };
 
   const persistAdminAuth = (
-    role: 'gestor' | 'superadmin',
+    role: AdminRole,
     userName: string,
     userId: number,
+    oficinaZonalId?: number,
+    oficinaZonal?: string,
     token?: string,
   ) => {
     if (typeof window === 'undefined') return;
-    const payload: StoredAdminAuth = { role, userName, userId, token };
+    const payload: StoredAdminAuth = { role, userName, userId, oficinaZonalId, oficinaZonal, token };
     setStoredValue(STORAGE_KEYS.userType, 'admin', true);
     setStoredValue(STORAGE_KEYS.adminAuth, JSON.stringify(payload), true);
     if (token) {
@@ -453,15 +474,18 @@ export default function App() {
     }
 
     if (isAdminPath) {
-      const section = path.split('/')[2] || 'registros';
+      let section = path.split('/')[2] || 'registros';
       if (section === 'postulaciones') {
-        setAdminSection('registros');
-        navigate('/admin/registros', { replace: true });
+        section = 'registros';
       } else if (section === 'convocatorias' || section === 'perfiles') {
-        setAdminSection('servicios');
-        navigate('/admin/servicios', { replace: true });
-      } else {
-        setAdminSection(section);
+        section = 'servicios';
+      }
+      const targetSection = isAdminSectionAllowed(section, adminRole)
+        ? section
+        : getAdminFallbackSection(adminRole);
+      setAdminSection(targetSection);
+      if (targetSection !== section) {
+        navigate(`/admin/${targetSection}`, { replace: true });
       }
     } else if (path.startsWith('/hojaVida')) {
       setActiveSection('hoja-vida');
@@ -473,7 +497,7 @@ export default function App() {
       setActiveSection('convocatorias'); 
       navigate('/servicios', { replace: true }); 
     } 
-  }, [location.pathname, isAuthenticated, userType, navigate]); 
+  }, [location.pathname, isAuthenticated, userType, adminRole, navigate]); 
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -535,6 +559,33 @@ export default function App() {
 
   // Auth handlers
   const handleLogin = (user: LoginResponse, remember = true) => {
+    const tipoUsuarioRaw =
+      (user as any)?.tipoUsuario ??
+      (user as any)?.tipo_usuario ??
+      (user as any)?.tipoUsuarioId ??
+      (user as any)?.idTipoUsuario;
+    const adminRoleFromTipo = mapTipoUsuarioToRole(tipoUsuarioRaw);
+    if (adminRoleFromTipo) {
+      const displayName = [user.nombres, user.apellidoPaterno, user.apellidoMaterno]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      const adminId = Number(user.idUsuario ?? user.idPersona ?? 0);
+      setAdminRole(adminRoleFromTipo);
+      setAdminUserName(displayName || user.email || user.nombres || 'Usuario');
+      setAdminUserId(adminId);
+      setIsAuthenticated(true);
+      setUserType('admin');
+      persistAdminAuth(
+        adminRoleFromTipo,
+        displayName || user.email || user.nombres || 'Usuario',
+        adminId,
+        user.token,
+      );
+      navigate('/admin/registros', { replace: true });
+      return;
+    }
+
     setPostulanteUser(user);
     setIsAuthenticated(true);
     setUserType('postulante');
@@ -561,17 +612,21 @@ export default function App() {
   };
 
   const handleAdminLogin = (
-    role: 'gestor' | 'superadmin',
+    role: AdminRole,
     username: string,
     adminId: number,
+    oficinaZonalId?: number,
+    oficinaZonal?: string,
     token?: string,
   ) => {
     setAdminRole(role);
     setAdminUserName(username);
     setAdminUserId(adminId);
+    setAdminOficinaZonalId(oficinaZonalId ?? 0);
+    setAdminOficinaZonal(oficinaZonal ?? '');
     setIsAuthenticated(true);
     setUserType('admin');
-    persistAdminAuth(role, username, adminId, token);
+    persistAdminAuth(role, username, adminId, oficinaZonalId, oficinaZonal, token);
     navigate('/admin/registros', { replace: true });
   };
 
@@ -582,8 +637,26 @@ export default function App() {
     setAdminRole(null);
     setAdminUserName('');
     setAdminUserId(0);
+    setAdminOficinaZonalId(0);
+    setAdminOficinaZonal('');
     clearAuthStorage();
     navigate('/admin/login', { replace: true });
+  };
+
+  const isAdminSectionAllowed = (section: string, role?: AdminRole | null) => {
+    if (!role) return true;
+    if (section === 'registros') return true;
+    if (section === 'servicios') return role !== 'uaba';
+    if (section === 'plantillas') return role === 'gestor' || role === 'superadmin';
+    if (section === 'usuarios') return role === 'superadmin';
+    return false;
+  };
+
+  const getAdminFallbackSection = (role?: AdminRole | null) => {
+    if (!role || role === 'gestor' || role === 'superadmin') return 'registros';
+    if (role === 'date') return 'registros';
+    if (role === 'uaba') return 'registros';
+    return 'registros';
   };
 
   const normalizeEstadoConvocatoria = (estado: string) => {
@@ -834,19 +907,6 @@ export default function App() {
     if (resumen.byConvocatoria.has(convId)) {
       return { blocked: true, reason: 'Ya estás registrado en este servicio.' };
     }
-    const ozKey = getConvocatoriaOzKey(conv);
-    if (!ozKey) {
-      return { blocked: false, reason: '' };
-    }
-    const count = resumen.byOz.get(ozKey) || 0;
-    const ozUsed = resumen.ozSet.has(ozKey);
-    const ozCount = resumen.ozSet.size;
-    if (count >= 2) {
-      return { blocked: true, reason: 'Ya tienes 2 servicios en esta Oficina Zonal.' };
-    }
-    if (!ozUsed && ozCount >= 2) {
-      return { blocked: true, reason: 'Ya estás asociado a 2 Oficinas Zonales.' };
-    }
     return { blocked: false, reason: '' };
   };
 
@@ -940,8 +1000,8 @@ export default function App() {
         <>
           {toaster}
           <AdminLogin
-            onLogin={(role, username, adminId, token) => {
-              handleAdminLogin(role, username, adminId, token);
+            onLogin={(role, username, adminId, token, oficinaZonalId, oficinaZonal) => {
+              handleAdminLogin(role, username, adminId, oficinaZonalId, oficinaZonal, token);
             }}
           />
         </>
@@ -1004,10 +1064,18 @@ export default function App() {
             <GestionPostulaciones 
               convocatorias={convocatorias}
               adminUserId={adminUserId}
+              adminRole={adminRole ?? undefined}
+              adminOficinaZonalId={adminOficinaZonalId || undefined}
+              adminOficinaZonal={adminOficinaZonal || undefined}
             />
           )}
           {adminSection === 'servicios' && (
-            <GestionConvocatorias adminUserId={adminUserId} />
+            <GestionConvocatorias
+              adminUserId={adminUserId}
+              adminRole={adminRole ?? undefined}
+              adminOficinaZonalId={adminOficinaZonalId || undefined}
+              adminOficinaZonal={adminOficinaZonal || undefined}
+            />
           )}
           {adminSection === 'plantillas' && <PlantillasCorreo />}
           {adminSection === 'usuarios' && <GestionUsuariosAdmin adminUserId={adminUserId} />}
@@ -1050,7 +1118,7 @@ export default function App() {
                 Servicios Disponibles 
               </h1> 
               <p className="mt-2 font-bold" style={{ color: '#108cc9' }}> 
-                Explora y regístrate hasta en 2 servicios por cada Oficina Zonal. Puedes asociarte como máximo a 2 Oficinas Zonales.
+                Puedes registrarte libremente en cualquier servicio publicado y en cualquier Oficina Zonal.
               </p> 
             </div> 
 

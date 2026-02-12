@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { X, Calendar, Briefcase, Building2, User, Mail, Save, CheckCircle } from 'lucide-react';
+import { X, Calendar, Briefcase, Building2, User, Mail, Save, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -19,6 +19,10 @@ interface Postulacion {
   idConvocatoria: string;
   idHojaVida: number;
   numeroPostulacion?: string;
+  contratoActivo?: boolean;
+  numeroContrato?: string;
+  oficinaZonalContrato?: string;
+  fechaFinContrato?: string;
   postulante: {
     nombre: string;
     documento: string;
@@ -38,6 +42,7 @@ interface DetallePostulacionAdminProps {
   adminUserId: number;
   onClose: () => void;
   onActualizarEstado: (postulacionId: string, nuevoEstado: string, observacion: string) => void;
+  canEditEstado?: boolean;
 }
 
 export function DetallePostulacionAdmin({
@@ -45,6 +50,7 @@ export function DetallePostulacionAdmin({
   adminUserId,
   onClose,
   onActualizarEstado,
+  canEditEstado = true,
 }: DetallePostulacionAdminProps) {
   const [estadoSeleccionado, setEstadoSeleccionado] = useState(postulacion.estado);
   const [comentario, setComentario] = useState(postulacion.observacion ?? '');
@@ -296,9 +302,25 @@ export function DetallePostulacionAdmin({
           </div>
         </Card>
       )}
-      {saveError && (
+      {canEditEstado && saveError && (
         <Card className="p-4 bg-red-50 border-red-200">
           <p className="text-sm font-medium text-red-700">{saveError}</p>
+        </Card>
+      )}
+      {postulacion.contratoActivo && (
+        <Card className="p-4 bg-red-50 border-red-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-700">No Disponible</p>
+              <p className="text-sm text-red-700 mt-1">
+                El ciudadano seleccionado se encuentra actualmente contratado por DEVIDA.
+                {postulacion.numeroContrato ? ` Contrato: ${postulacion.numeroContrato}.` : ''}
+                {postulacion.oficinaZonalContrato ? ` Oficina Zonal: ${postulacion.oficinaZonalContrato}.` : ''}
+                {postulacion.fechaFinContrato ? ` Fecha fin: ${postulacion.fechaFinContrato}.` : ''}
+              </p>
+            </div>
+          </div>
         </Card>
       )}
 
@@ -394,65 +416,67 @@ export function DetallePostulacionAdmin({
       </Card>
 
       {/* Gestión de Estado */}
-      <Card className="p-6 bg-amber-50 border-amber-200">
-        <h3 className="text-lg font-bold mb-4" style={{ color: '#04a25c' }}>
-          Actualizar Estado del Registro
-        </h3>
+      {canEditEstado && (
+        <Card className="p-6 bg-amber-50 border-amber-200">
+          <h3 className="text-lg font-bold mb-4" style={{ color: '#04a25c' }}>
+            Actualizar Estado del Registro
+          </h3>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">
-                Nuevo Estado *
-              </label>
-              <select
-                value={estadoSeleccionado}
-                onChange={(e) => setEstadoSeleccionado(e.target.value as any)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Nuevo Estado *
+                </label>
+                <select
+                  value={estadoSeleccionado}
+                  onChange={(e) => setEstadoSeleccionado(e.target.value as any)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="registrado">Registrado</option>
+                  <option value="cumple">Cumple</option>
+                  <option value="no cumple">No cumple</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Comentarios (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={comentario}
+                  onChange={(e) => setComentario(e.target.value)}
+                  placeholder="Agregar comentario interno..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleGuardarEstado}
+                disabled={isSaving || estadoSeleccionado === postulacion.estado}
+                className="bg-green-600 hover:bg-green-700 gap-2"
               >
-                <option value="registrado">Registrado</option>
-                <option value="cumple">Cumple</option>
-                <option value="no cumple">No cumple</option>
-              </select>
+                <Save className="w-4 h-4" />
+                {isSaving ? 'Guardando...' : 'Guardar Estado'}
+              </Button>
+              {estadoSeleccionado !== postulacion.estado && (
+                <p className="text-sm text-amber-700 font-medium">
+                  ⚠ Hay cambios sin guardar
+                </p>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">
-                Comentarios (Opcional)
-              </label>
-              <input
-                type="text"
-                value={comentario}
-                onChange={(e) => setComentario(e.target.value)}
-                placeholder="Agregar comentario interno..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handleGuardarEstado}
-              disabled={isSaving || estadoSeleccionado === postulacion.estado}
-              className="bg-green-600 hover:bg-green-700 gap-2"
-            >
-              <Save className="w-4 h-4" />
-              {isSaving ? 'Guardando...' : 'Guardar Estado'}
-            </Button>
-            {estadoSeleccionado !== postulacion.estado && (
-              <p className="text-sm text-amber-700 font-medium">
-                ⚠ Hay cambios sin guardar
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-800">
+                <strong>Nota:</strong> Al cambiar el estado, el registro quedará actualizado para el seguimiento interno.
               </p>
-            )}
+            </div>
           </div>
-
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-800">
-              <strong>Nota:</strong> Al cambiar el estado, el registro quedará actualizado para el seguimiento interno.
-            </p>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* Hoja de Vida */}
       <div>

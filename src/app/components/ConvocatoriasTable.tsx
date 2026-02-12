@@ -121,6 +121,15 @@ export function ConvocatoriasTable({
     return today >= start && today <= end;
   };
 
+  const isPublicado = (conv: Convocatoria) => {
+    if (conv.estadoId !== undefined && conv.estadoId !== null && conv.estadoId !== '') {
+      return String(conv.estadoId) === '0';
+    }
+    const normalized = (conv.estado || '').toLowerCase();
+    if (normalized.includes('inact')) return false;
+    return normalized.includes('public');
+  };
+
   return (
     <Card className="p-6">
       <div className="space-y-4">
@@ -191,7 +200,7 @@ export function ConvocatoriasTable({
                         {(() => {
                           const bloqueo = getRegistroBloqueo ? getRegistroBloqueo(conv) : { blocked: false, reason: '' };
                           const registroHabilitado =
-                            conv.estadoId === 1 &&
+                            isPublicado(conv) &&
                             isWithinRange(conv.fechaInicio, conv.fechaFin) &&
                             hojaVidaCompleta &&
                             !bloqueo.blocked;
@@ -214,7 +223,7 @@ export function ConvocatoriasTable({
                               ? bloqueo.reason
                               : !hojaVidaCompleta
                               ? 'Completa tu Hoja de Vida para registrarte'
-                              : conv.estadoId !== 1
+                              : !isPublicado(conv)
                               ? 'Este servicio está inactivo'
                               : 'Este servicio está fuera de vigencia';
 

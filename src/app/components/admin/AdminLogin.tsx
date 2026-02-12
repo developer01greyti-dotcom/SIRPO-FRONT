@@ -3,9 +3,17 @@ import { Shield, Eye, EyeOff, LogIn } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { loginAdmin } from '../../api/adminAuth';
+import { mapTipoUsuarioToRole, type AdminRole } from '../../utils/roles';
 
 interface AdminLoginProps {
-  onLogin: (role: 'gestor' | 'superadmin', username: string, adminId: number, token?: string) => void;
+  onLogin: (
+    role: AdminRole,
+    username: string,
+    adminId: number,
+    token?: string,
+    oficinaZonalId?: number,
+    oficinaZonal?: string,
+  ) => void;
 }
 
 export function AdminLogin({ onLogin }: AdminLoginProps) {
@@ -35,11 +43,20 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
         return;
       }
 
+      const roleFromTipo = mapTipoUsuarioToRole(result.tipoUsuario);
       const roleText = (result.rol || '').toLowerCase();
       const normalizedRole =
-        roleText.includes('super') || roleText.includes('admin') ? 'superadmin' : 'gestor';
+        roleFromTipo ??
+        (roleText.includes('super') || roleText.includes('admin') ? 'superadmin' : 'gestor');
       const displayName = result.nombreCompleto || result.usuario || formData.usuario;
-      onLogin(normalizedRole, displayName, Number(result.idAdmin), result.token);
+      onLogin(
+        normalizedRole,
+        displayName,
+        Number(result.idAdmin),
+        result.token,
+        result.idOficinaZonal,
+        result.oficinaZonal,
+      );
     } catch (err) {
       setError('No se pudo iniciar sesión. Inténtalo nuevamente.');
     } finally {

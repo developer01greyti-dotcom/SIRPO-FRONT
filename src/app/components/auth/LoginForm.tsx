@@ -83,7 +83,7 @@ export function LoginForm({ onLogin, onNavigateToRegister, onNavigateToRecovery 
                 <Input
                   id="email"
                   name="email"
-                  type="email"
+                  type="text"
                   placeholder="correo@ejemplo.com"
                   className="pl-10"
                   required

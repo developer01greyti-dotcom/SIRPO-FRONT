@@ -19,6 +19,7 @@ import {
 import { ConvocatoriaForm } from "./ConvocatoriaForm";
 import { deleteConvocatoria, fetchConvocatoriasList, type ConvocatoriaListItem } from "../../api/convocatorias";
 import { fetchEstadoConvocatoriaDropdown, fetchOficinaCoordinacionList, fetchPerfilDropdown, type DropdownItem, type OficinaZonalCoordinacionItem } from "../../api/catalogos";
+import { canCreateServicios, canDeleteServicios, canManageServicios, type AdminRole } from "../../utils/roles";
 
 interface ConvocatoriaAdmin extends ConvocatoriaListItem {
   codigo?: string;
@@ -38,9 +39,20 @@ interface ConvocatoriaAdmin extends ConvocatoriaListItem {
 
 interface GestionConvocatoriasProps {
   adminUserId?: number;
+  adminRole?: AdminRole;
+  adminOficinaZonalId?: number;
+  adminOficinaZonal?: string;
 }
 
-export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasProps) {
+export function GestionConvocatorias({
+  adminUserId = 0,
+  adminRole,
+  adminOficinaZonalId,
+  adminOficinaZonal,
+}: GestionConvocatoriasProps) {
+  const canCreate = canCreateServicios(adminRole);
+  const canEdit = canManageServicios(adminRole);
+  const canDelete = canDeleteServicios(adminRole);
   const [convocatorias, setConvocatorias] = useState<ConvocatoriaAdmin[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -66,12 +78,25 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
     convocatoria: ConvocatoriaAdmin | null;
   }>({ open: false, convocatoria: null });
 
+  const normalizeOz = (value?: string) => (value || '').trim().toUpperCase();
+  const matchesAdminOz = (item: ConvocatoriaAdmin) => {
+    if (!adminOficinaZonalId && !adminOficinaZonal) return true;
+    if (adminOficinaZonalId && String(item.idOficinaZonal ?? '') === String(adminOficinaZonalId)) {
+      return true;
+    }
+    if (adminOficinaZonal) {
+      return normalizeOz(item.oficinaZonal ?? '') === normalizeOz(adminOficinaZonal);
+    }
+    return false;
+  };
+
   const loadConvocatorias = async (overrideFilters = filters) => {
     setIsLoading(true);
     setLoadError(null);
     try {
       const data = await fetchConvocatoriasList(overrideFilters);
-      setConvocatorias(data);
+      const filtered = data.filter(matchesAdminOz);
+      setConvocatorias(filtered);
     } catch (error) {
       setConvocatorias([]);
       setLoadError("No se pudo cargar el listado de servicios.");
@@ -147,6 +172,8 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
 
   const normalizeEstado = (estado: string) => {
     const value = (estado || "").toLowerCase();
+    if (value.includes("public")) return "publicado";
+    if (value.includes("inact")) return "inactivo";
     if (value.includes("abier")) return "abierta";
     if (value.includes("cerr")) return "cerrada";
     if (value.includes("prox") || value.includes("próx")) return "proxima";
@@ -154,6 +181,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
   };
 
   const handleNuevaConvocatoria = () => {
+    if (!canCreate) return;
     setSelectedConvocatoria(null);
     setIsEditing(false);
     setShowForm(true);
@@ -190,7 +218,18 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
 
   const getEstadoBadge = (estado: string) => {
     const normalized = normalizeEstado(estado);
+    if (estado === '0' || estado === '1') {
+      return estado === '0' ? (
+        <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Publicado</Badge>
+      ) : (
+        <Badge variant="secondary" className="bg-gray-100 text-gray-700">Inactivo</Badge>
+      );
+    }
     switch (normalized) {
+      case "publicado":
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Publicado</Badge>;
+      case "inactivo":
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-700">Inactivo</Badge>;
       case "abierta":
         return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Abierta</Badge>;
       case "cerrada":
@@ -232,6 +271,7 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
       <ConvocatoriaForm
         convocatoria={selectedConvocatoria}
         isEditing={isEditing}
+        adminRole={adminRole}
         usuarioAccion={adminUserId}
         onGuardar={async () => {
           await loadConvocatorias();
@@ -258,10 +298,12 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
             Administrar servicios laborales de DEVIDA
           </p>
         </div>
-        <Button onClick={handleNuevaConvocatoria} className="bg-green-600 hover:bg-green-700 gap-2">
-          <Plus className="w-4 h-4" />
-          Nuevo Servicio
-        </Button>
+        {canCreate && (
+          <Button onClick={handleNuevaConvocatoria} className="bg-green-600 hover:bg-green-700 gap-2">
+            <Plus className="w-4 h-4" />
+            Nuevo Servicio
+          </Button>
+        )}
       </div>
 
       <Card className="p-6">
@@ -498,24 +540,28 @@ export function GestionConvocatorias({ adminUserId = 0 }: GestionConvocatoriasPr
                               <Eye className="w-4 h-4" />
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditarConvocatoria(conv)}
-                            className="h-8 w-8 p-0"
-                            title="Editar"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEliminarConvocatoria(conv)}
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditarConvocatoria(conv)}
+                              className="h-8 w-8 p-0"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEliminarConvocatoria(conv)}
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -20,6 +20,7 @@ export interface RegisterResponse {
   tipoDocumento?: string;
   numeroDocumento?: string;
   ruc?: string;
+  tipoUsuario?: number | string;
   token?: string;
 }
 
@@ -82,6 +83,7 @@ export interface LoginResponse {
   tipoDocumento?: string;
   numeroDocumento?: string;
   ruc?: string;
+  tipoUsuario?: number | string;
   token?: string;
 }
 

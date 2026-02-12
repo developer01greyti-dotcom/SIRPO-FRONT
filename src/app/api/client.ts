@@ -7,6 +7,7 @@ const baseURL =
 
 export const apiClient = axios.create({
   baseURL,
+  withCredentials: true,
 });
 
 const getStoredAuthToken = () => {
@@ -39,11 +40,26 @@ const isAuthEndpoint = (url?: string) => {
   );
 };
 
+const getBasePath = () => {
+  const base = (import.meta as { env?: { BASE_URL?: string } })?.env?.BASE_URL || '/';
+  if (!base.endsWith('/')) return `${base}/`;
+  return base;
+};
+
+const resolveWithBase = (path: string) => {
+  const base = getBasePath();
+  if (path.startsWith('/')) return `${base}${path.replace(/^\//, '')}`;
+  return `${base}${path}`;
+};
+
 const redirectToLogin = () => {
   if (typeof window === 'undefined') return;
   const userType =
     localStorage.getItem('sirpo.userType') || sessionStorage.getItem('sirpo.userType') || '';
-  const target = userType === 'admin' ? '/admin/login' : '/login';
+  const isAdminPath = window.location.pathname.includes('/admin');
+  const target = resolveWithBase(
+    userType === 'admin' || isAdminPath ? 'admin/login' : 'login',
+  );
   if (window.location.pathname !== target) {
     window.location.assign(target);
   }

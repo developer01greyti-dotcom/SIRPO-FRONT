@@ -6,6 +6,7 @@ import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { 
   fetchOficinaCoordinacionList, 
+  fetchEstadoConvocatoriaDropdown,
   fetchPerfilDropdown, 
   fetchTipoContratoDropdown, 
   type DropdownItem, 
@@ -13,6 +14,7 @@ import {
 } from '../../api/catalogos'; 
 import { upsertConvocatoria, type ConvocatoriaUpsertPayload } from '../../api/convocatorias';
 import { saveHvRefArchivo } from '../../api/hvRefArchivo';
+import { type AdminRole } from '../../utils/roles';
 
 interface Convocatoria {
   id?: string | number;
@@ -20,12 +22,14 @@ interface Convocatoria {
   nombre?: string;
   titulo?: string;
   oficinaCoordinacion?: string;
+  oficinaZonal?: string;
   perfil?: string;
   fechaInicio?: string;
   fechaFin?: string;
   pdfUrl?: string;
   archivoGuid?: string;
   idPerfil?: number | string;
+  idOficinaZonal?: number | string;
   idOficinaCoordinacion?: number | string;
   tipoContrato?: string;
   numeroVacantes?: number;
@@ -42,6 +46,7 @@ interface ConvocatoriaFormProps {
   convocatoria: Convocatoria | null;
   isEditing: boolean;
   usuarioAccion: number;
+  adminRole?: AdminRole;
   onGuardar: () => void;
   onCancelar: () => void;
 }
@@ -50,11 +55,23 @@ export function ConvocatoriaForm({
   convocatoria,
   isEditing,
   usuarioAccion,
+  adminRole,
   onGuardar,
   onCancelar,
 }: ConvocatoriaFormProps) {
+  const detailLabels =
+    adminRole === 'date'
+      ? {
+          requisitos: 'Perfil requerido del profesional',
+          funciones: 'Actividades a desarrollar',
+        }
+      : {
+          requisitos: 'Requisitos mínimos',
+          funciones: 'Funciones principales',
+        };
   const [perfilOptions, setPerfilOptions] = useState<DropdownItem[]>([]);
   const [tipoContratoOptions, setTipoContratoOptions] = useState<DropdownItem[]>([]);
+  const [estadoOptions, setEstadoOptions] = useState<DropdownItem[]>([]);
   const [oficinaOptions, setOficinaOptions] = useState<OficinaZonalCoordinacionItem[]>([]);
   const [oficinaQuery, setOficinaQuery] = useState('');
   const [isOficinaLoading, setIsOficinaLoading] = useState(false);
@@ -105,7 +122,13 @@ export function ConvocatoriaForm({
     idConvocatoria: Number(convocatoria?.idConvocatoria ?? convocatoria?.id ?? 0), 
     titulo: convocatoria?.titulo || convocatoria?.nombre || '', 
     idPerfil: String(convocatoria?.idPerfil ?? ''), 
+    idOficinaZonal: String(convocatoria?.idOficinaZonal ?? ''), 
     idOficinaCoordinacion: String(convocatoria?.idOficinaCoordinacion ?? ''), 
+    oficinaZonal:
+      convocatoria?.oficinaZonal ||
+      (convocatoria?.oficinaCoordinacion
+        ? convocatoria.oficinaCoordinacion.split('/')[0]?.trim() || ''
+        : ''), 
     tipoContrato: convocatoria?.tipoContrato || '', 
     numeroVacantes: convocatoria?.numeroVacantes ? String(convocatoria.numeroVacantes) : '', 
     fechaInicio: convocatoria ? toInputDate(convocatoria?.fechaInicio) : getDefaultDates().fechaInicio, 
@@ -130,7 +153,9 @@ export function ConvocatoriaForm({
         idConvocatoria: 0, 
         titulo: '', 
         idPerfil: '', 
+        idOficinaZonal: '', 
         idOficinaCoordinacion: '', 
+        oficinaZonal: '', 
         tipoContrato: '', 
         numeroVacantes: '', 
         fechaInicio: defaults.fechaInicio, 
@@ -154,7 +179,13 @@ export function ConvocatoriaForm({
       idConvocatoria: Number(convocatoria?.idConvocatoria ?? convocatoria?.id ?? 0),
       titulo: convocatoria?.titulo || convocatoria?.nombre || '',
       idPerfil: String(convocatoria?.idPerfil ?? ''),
+      idOficinaZonal: String(convocatoria?.idOficinaZonal ?? ''),
       idOficinaCoordinacion: String(convocatoria?.idOficinaCoordinacion ?? ''),
+      oficinaZonal:
+        convocatoria?.oficinaZonal ||
+        (convocatoria?.oficinaCoordinacion
+          ? convocatoria.oficinaCoordinacion.split('/')[0]?.trim() || ''
+          : ''),
       tipoContrato: convocatoria?.tipoContrato || '',
       numeroVacantes: convocatoria?.numeroVacantes ? String(convocatoria.numeroVacantes) : '',
       fechaInicio: toInputDate(convocatoria?.fechaInicio),
@@ -175,12 +206,14 @@ export function ConvocatoriaForm({
   useEffect(() => {
     const loadCatalogs = async () => {
       try {
-        const [perfiles, tiposContrato] = await Promise.all([
+        const [perfiles, tiposContrato, estados] = await Promise.all([
           fetchPerfilDropdown(),
           fetchTipoContratoDropdown(),
+          fetchEstadoConvocatoriaDropdown(),
         ]);
         setPerfilOptions(perfiles || []);
         setTipoContratoOptions(tiposContrato || []);
+        setEstadoOptions(estados || []);
       } catch (err) {
         setError('No se pudieron cargar los catálogos.');
       }
@@ -321,7 +354,7 @@ export function ConvocatoriaForm({
     e.preventDefault();
     setError('');
 
-    if (!formData.titulo || !formData.idPerfil || !formData.idOficinaCoordinacion) {
+    if (!formData.titulo || !formData.idPerfil || !formData.oficinaZonal || !formData.estado) {
       setError('Complete los campos obligatorios.');
       return;
     }
@@ -332,13 +365,14 @@ export function ConvocatoriaForm({
         idConvocatoria: Number(formData.idConvocatoria || 0),
         titulo: formData.titulo,
         idPerfil: Number(formData.idPerfil),
-        idOficinaCoordinacion: Number(formData.idOficinaCoordinacion),
+        idOficinaCoordinacion: Number(formData.idOficinaCoordinacion || 0),
         tipoContrato: formData.tipoContrato || '',
         numeroVacantes: Number(formData.numeroVacantes || 0),
         fechaInicio: formData.fechaInicio,
         fechaFin: formData.fechaFin,
         requisitosMinimos: formData.requisitosMinimos || '',
         funcionesPrincipales: formData.funcionesPrincipales || '',
+        estado: String(formData.estado || ''),
         idArchivoBases: formData.idArchivoBases ? 1 : 0,
         usuarioAccion,
       };
@@ -423,7 +457,7 @@ export function ConvocatoriaForm({
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4"> 
               <div className="space-y-2"> 
                 <label className="block text-sm font-semibold text-gray-700">Categoría de Servicio *</label> 
                 <select 
@@ -442,8 +476,18 @@ export function ConvocatoriaForm({
               </div> 
 
               <div className="space-y-2"> 
+                <label className="block text-sm font-semibold text-gray-700">Oficina Zonal *</label> 
+                <Input 
+                  value={formData.oficinaZonal} 
+                  readOnly 
+                  placeholder="Selecciona una oficina de coordinación" 
+                  className="bg-gray-50" 
+                /> 
+              </div> 
+
+              <div className="space-y-2"> 
                 <label className="block text-sm font-semibold text-gray-700"> 
-                  Oficina de Coordinación * 
+                  Oficina de Coordinación (opcional) 
                 </label> 
                 <Select 
                   name="idOficinaCoordinacion" 
@@ -455,6 +499,8 @@ export function ConvocatoriaForm({
                     setFormData((prev) => ({ 
                       ...prev, 
                       idOficinaCoordinacion: value, 
+                      idOficinaZonal: selected?.idOficinaZonal ? String(selected.idOficinaZonal) : prev.idOficinaZonal,
+                      oficinaZonal: selected?.oficinaZonal ?? prev.oficinaZonal,
                     })); 
                     if (selected) { 
                       setOficinaQuery(selected.oficinaCoordinacion); 
@@ -482,6 +528,8 @@ export function ConvocatoriaForm({
                               setFormData((prev) => ({ 
                                 ...prev, 
                                 idOficinaCoordinacion: '', 
+                                idOficinaZonal: '', 
+                                oficinaZonal: '',
                               })); 
                             } 
                           }} 
@@ -500,6 +548,8 @@ export function ConvocatoriaForm({
                             setFormData((prev) => ({ 
                               ...prev, 
                               idOficinaCoordinacion: '', 
+                              idOficinaZonal: '', 
+                              oficinaZonal: '',
                             })); 
                             setOficinaOptions([]); 
                             const input = document.getElementById('oficinaCoordSearch') as HTMLInputElement | null; 
@@ -534,7 +584,7 @@ export function ConvocatoriaForm({
               </div> 
             </div> 
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4"> 
               <div className="space-y-2"> 
                 <label className="block text-sm font-semibold text-gray-700">Tipo de proceso</label> 
                 <select 
@@ -560,6 +610,22 @@ export function ConvocatoriaForm({
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" 
                 /> 
               </div> 
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Estado *</label>
+                <select
+                  value={formData.estado}
+                  onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  required
+                >
+                  <option value="">Seleccione...</option>
+                  {estadoOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.descripcion}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div> 
           </div>
         </Card>
@@ -601,7 +667,7 @@ export function ConvocatoriaForm({
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">Requisitos mínimos</label>
+              <label className="block text-sm font-semibold text-gray-700">{detailLabels.requisitos}</label>
               <textarea
                 value={formData.requisitosMinimos}
                 onChange={(e) => setFormData({ ...formData, requisitosMinimos: e.target.value })}
@@ -609,7 +675,7 @@ export function ConvocatoriaForm({
               />
             </div>
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">Funciones principales</label>
+              <label className="block text-sm font-semibold text-gray-700">{detailLabels.funciones}</label>
               <textarea
                 value={formData.funcionesPrincipales}
                 onChange={(e) => setFormData({ ...formData, funcionesPrincipales: e.target.value })}

@@ -44,6 +44,7 @@ export interface ConvocatoriaUpsertPayload {
   fechaFin: string;
   requisitosMinimos: string;
   funcionesPrincipales: string;
+  estado: string;
   idArchivoBases: number;
   usuarioAccion: number;
 }
@@ -108,6 +109,7 @@ export const upsertConvocatoria = async (
         fechaFin: payload.fechaFin,
         clob1: payload.requisitosMinimos,
         clob2: payload.funcionesPrincipales,
+        estado: payload.estado,
         idArchivoBases: payload.idArchivoBases,
         usuarioAccion: payload.usuarioAccion,
       },
