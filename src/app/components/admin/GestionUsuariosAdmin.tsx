@@ -17,6 +17,13 @@ import {
 import { fetchAdminUsers, updateAdminUserStatus, upsertAdminUser } from '../../api/adminUsers';
 import { fetchRolDropdown, type DropdownItem } from '../../api/catalogos';
 
+const ROLE_OPTIONS: DropdownItem[] = [
+  { id: 0, descripcion: 'Usuario (sin acceso admin)' },
+  { id: 1, descripcion: 'Admin (total acceso)' },
+  { id: 2, descripcion: 'DATE' },
+  { id: 3, descripcion: 'UABA' },
+];
+
 interface UsuarioAdmin {
   id: string;
   usuarioAD: string;
@@ -79,11 +86,14 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
         const [users, roles] = await Promise.all([fetchAdminUsers(), fetchRolDropdown()]);
         if (!isActive) return;
         setUsuarios(users);
-        setRolOptions(roles);
+        const normalizedRoles = roles?.length ? roles : ROLE_OPTIONS;
+        const roleIds = new Set(normalizedRoles.map((item) => String(item.id)));
+        const hasExpected = ROLE_OPTIONS.every((item) => roleIds.has(String(item.id)));
+        setRolOptions(hasExpected ? normalizedRoles : ROLE_OPTIONS);
       } catch (error) {
         if (!isActive) return;
         setUsuarios([]);
-        setRolOptions([]);
+        setRolOptions(ROLE_OPTIONS);
         setLoadError('No se pudo cargar el listado de usuarios.');
       } finally {
         if (isActive) {
@@ -101,13 +111,19 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
 
   const getNormalizedRole = (rol: string, rolId?: string | number) => {
     const rolText = (rol || '').toLowerCase();
-    if (rolText.includes('super')) {
-      return 'superadmin';
+    if (rolId === 1 || rolId === '1' || rolText.includes('admin') || rolText.includes('super')) {
+      return 'admin';
     }
-    if (rolId === 2 || rolId === '2') {
-      return 'superadmin';
+    if (rolId === 2 || rolId === '2' || rolText.includes('date')) {
+      return 'date';
     }
-    return 'gestor';
+    if (rolId === 3 || rolId === '3' || rolText.includes('uaba')) {
+      return 'uaba';
+    }
+    if (rolId === 0 || rolId === '0' || rolText.includes('usuario')) {
+      return 'usuario';
+    }
+    return 'usuario';
   };
 
   const isActiveUser = (estado: string) => {
@@ -117,13 +133,11 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
 
   const stats = useMemo(() => {
     const activos = usuarios.filter((u) => isActiveUser(u.estado));
-    const superAdmins = usuarios.filter(
-      (u) => getNormalizedRole(u.rol, u.rolId) === 'superadmin',
-    );
+    const admins = usuarios.filter((u) => getNormalizedRole(u.rol, u.rolId) === 'admin');
     return {
       total: usuarios.length,
       activos: activos.length,
-      superAdmins: superAdmins.length,
+      admins: admins.length,
     };
   }, [usuarios]);
 
@@ -225,10 +239,17 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
   };
 
   const getRolBadge = (rol: string, rolId?: string | number) => {
-    if (getNormalizedRole(rol, rolId) === 'superadmin') {
-      return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Super Admin</Badge>;
+    const normalized = getNormalizedRole(rol, rolId);
+    if (normalized === 'admin') {
+      return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Admin</Badge>;
     }
-    return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Gestor de Convocatorias</Badge>;
+    if (normalized === 'date') {
+      return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">DATE</Badge>;
+    }
+    if (normalized === 'uaba') {
+      return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">UABA</Badge>;
+    }
+    return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">Usuario</Badge>;
   };
 
   const getEstadoBadge = (estado: string) => {
@@ -238,7 +259,8 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
     return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">Inactivo</Badge>;
   };
 
-  const selectedRoleName = rolOptions.find((item) => String(item.id) === String(formData.rolId))?.descripcion || '';
+  const selectedRoleName =
+    rolOptions.find((item) => String(item.id) === String(formData.rolId))?.descripcion || '';
 
   // Vista de Formulario (Crear/Editar)
   if (showForm) {
@@ -334,19 +356,22 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
                   Permisos del rol seleccionado:
                 </p>
                 <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
-                  {getNormalizedRole(selectedRoleName, formData.rolId) === 'gestor' ? (
+                  {getNormalizedRole(selectedRoleName, formData.rolId) === 'admin' ? (
                     <>
                       <li>Gestión de Registros</li>
-                      <li>Gestión de Convocatorias</li>
-                      <li>Plantillas de Correo</li>
-                    </>
-                  ) : (
-                    <>
-                      <li>Gestión de Registros</li>
-                      <li>Gestión de Convocatorias</li>
+                      <li>Gestión de Servicios</li>
                       <li>Plantillas de Correo</li>
                       <li>Gestión de Usuarios Administrativos</li>
                     </>
+                  ) : getNormalizedRole(selectedRoleName, formData.rolId) === 'date' ? (
+                    <>
+                      <li>Gestión de Registros</li>
+                      <li>Gestión de Servicios</li>
+                    </>
+                  ) : getNormalizedRole(selectedRoleName, formData.rolId) === 'uaba' ? (
+                    <li>Gestión de Registros</li>
+                  ) : (
+                    <li>Sin acceso al panel administrativo</li>
                   )}
                 </ul>
               </div>
@@ -408,8 +433,8 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
           <p className="text-2xl font-bold text-green-900 mt-1">{stats.activos}</p>
         </Card>
         <Card className="p-4 bg-purple-50 border-purple-200">
-          <p className="text-sm font-semibold text-purple-700">Super Admins</p>
-          <p className="text-2xl font-bold text-purple-900 mt-1">{stats.superAdmins}</p>
+          <p className="text-sm font-semibold text-purple-700">Admins</p>
+          <p className="text-2xl font-bold text-purple-900 mt-1">{stats.admins}</p>
         </Card>
       </div>
 
