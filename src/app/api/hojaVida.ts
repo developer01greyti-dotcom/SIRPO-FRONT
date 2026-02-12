@@ -151,6 +151,7 @@ export interface HvExpUpsertPayload {
   fechaFin: string;
   idArchivo: number;
   usuarioAccion: number;
+  experienciaEspecifica: number;
 }
 
 const normalizeHojaVidaActual = (raw: any): HojaVidaActual | null => {
@@ -482,13 +483,41 @@ export const upsertHvCur = async (
 export const upsertHvExp = async (
   payload: HvExpUpsertPayload,
 ): Promise<number> => {
-  const response = await apiClient.post<any>('/hv_exp_upsert/list', {
-    estructura: payload,
-  });
-  const data = response.data;
-  const normalized = Array.isArray(data) ? data[0] : data;
-  const idHvExperiencia = normalized?.idHvExperiencia ?? normalized?.id ?? 0;
-  return Number(idHvExperiencia) || 0;
+  const orderedPayload: HvExpUpsertPayload = {
+    idHvExperiencia: payload.idHvExperiencia,
+    idHojaVida: payload.idHojaVida,
+    tipoExperiencia: payload.tipoExperiencia,
+    tipoEntidad: payload.tipoEntidad,
+    nombreEntidad: payload.nombreEntidad,
+    idUbigeo: payload.idUbigeo,
+    area: payload.area,
+    cargo: payload.cargo,
+    funcionesPrincipales: payload.funcionesPrincipales,
+    motivoCese: payload.motivoCese,
+    fechaInicio: payload.fechaInicio,
+    fechaFin: payload.fechaFin,
+    idArchivo: payload.idArchivo,
+    experienciaEspecifica: payload.experienciaEspecifica ?? 0,
+    usuarioAccion: payload.usuarioAccion,
+  };
+
+  const send = async (url: string) => {
+    const response = await apiClient.post<any>(url, { estructura: orderedPayload });
+    const data = response.data;
+    const normalized = Array.isArray(data) ? data[0] : data;
+    const idHvExperiencia = normalized?.idHvExperiencia ?? normalized?.id ?? 0;
+    return Number(idHvExperiencia) || 0;
+  };
+
+  try {
+    return await send('/hv_exp_upsert/list');
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status === 404) {
+      return await send('/hv_exp_upsert');
+    }
+    throw error;
+  }
 };
 
 export const deleteHvForm = async (

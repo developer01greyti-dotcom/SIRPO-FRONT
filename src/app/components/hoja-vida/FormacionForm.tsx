@@ -15,6 +15,7 @@ import {
 import { upsertHvForm } from '../../api/hojaVida';
 import { deleteHvRefArchivo, fetchHvRefArchivo, saveHvRefArchivo } from '../../api/hvRefArchivo';
 import { PAISES_CATALOGO } from '../../data/paises';
+import { pedirRUC } from '../../api/pide';
 
 interface Formacion {
   id: string;
@@ -50,9 +51,14 @@ export function FormacionForm({
   const [documentoPreview, setDocumentoPreview] = useState<string | null>(formacion?.documento || null);
   const [documentoFile, setDocumentoFile] = useState<File | null>(null);
   const [documentoEliminado, setDocumentoEliminado] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveMessageType, setSaveMessageType] = useState<'success' | 'error' | null>(null);
+  const [isSearchingRuc, setIsSearchingRuc] = useState(false);
   const [tipoInstitucion, setTipoInstitucion] = useState<string>(formacion?.tipoInstitucionId || '');
   const [tipoEntidad, setTipoEntidad] = useState<string>(formacion?.tipoEntidadId || '');
   const [nivelEstudio, setNivelEstudio] = useState<string>(formacion?.nivelEstudioId || '');
+  const [rucValue, setRucValue] = useState<string>(formacion?.ruc || '');
+  const [institucionValue, setInstitucionValue] = useState<string>(formacion?.institucion || '');
   const [distritoValue, setDistritoValue] = useState<string>(formacion?.distrito || '');
   const [ubigeoQuery, setUbigeoQuery] = useState<string>(formacion?.distrito || '');
   const [ubigeoOptions, setUbigeoOptions] = useState<DropdownItem[]>([]);
@@ -88,6 +94,29 @@ export function FormacionForm({
   };
   const getPaisDescripcion = (value: string) =>
     PAISES_CATALOGO.find((item) => item.id === value)?.descripcion || '';
+
+  const pickValue = (data: any, keys: string[]) => {
+    if (!data) return '';
+    for (const key of keys) {
+      const value = data?.[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return '';
+  };
+
+  const extractPayload = (data: any) => {
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    }
+    if (data?.datosPrincipales) return data.datosPrincipales;
+    if (data?.data?.datosPrincipales) return data.data.datosPrincipales;
+    if (data?.resultado?.datosPrincipales) return data.resultado.datosPrincipales;
+    if (data?.data) return data.data;
+    if (data?.resultado) return data.resultado;
+    return data ?? {};
+  };
 
   useEffect(() => {
     let isActive = true;
@@ -175,6 +204,8 @@ export function FormacionForm({
       setTipoInstitucion('');
       setTipoEntidad('');
       setNivelEstudio('');
+      setRucValue('');
+      setInstitucionValue('');
       setDistritoValue('');
       setUbigeoQuery('');
       setPendingUbigeoId('');
@@ -184,12 +215,16 @@ export function FormacionForm({
       setDocumentoFile(null);
       setDocumentoPreview(null);
       setDocumentoEliminado(false);
+      setSaveMessage(null);
+      setSaveMessageType(null);
       return;
     }
 
     setTipoInstitucion(formacion?.tipoInstitucionId || '');
     setTipoEntidad(formacion?.tipoEntidadId || '');
     setNivelEstudio(formacion?.nivelEstudioId || '');
+    setRucValue(formacion?.ruc || '');
+    setInstitucionValue(formacion?.institucion || '');
     const distritoId = String(formacion?.distritoId || '');
     const distritoDesc = formacion?.distritoDescripcion || '';
     setDistritoValue('');
@@ -203,6 +238,8 @@ export function FormacionForm({
     setDocumentoPreview(formacion?.documento || null);
     setDocumentoFile(null);
     setDocumentoEliminado(false);
+    setSaveMessage(null);
+    setSaveMessageType(null);
   }, [modo, formacion]);
 
   const formatFechaDisplay = (value: string) => {
@@ -245,30 +282,91 @@ export function FormacionForm({
     window.open(documentoPreview, '_blank', 'noopener,noreferrer');
   };
 
+  const handleBuscarRuc = async () => {
+    setSaveMessage(null);
+    setSaveMessageType(null);
+    if (!rucValue.trim()) {
+      setSaveMessage('Ingrese el número de RUC.');
+      setSaveMessageType('error');
+      return;
+    }
+    try {
+      setIsSearchingRuc(true);
+      const data = await pedirRUC(rucValue.trim());
+      const payload = extractPayload(data);
+      const razon =
+        pickValue(payload, [
+          'razonSocial',
+          'razon_social',
+          'nombre_o_razon_social',
+          'razonSocialEmpresa',
+          'nombreORazonSocial',
+          'nombre',
+        ]) ||
+        pickValue(data, ['razonSocial', 'razon_social', 'nombre_o_razon_social']);
+      if (!razon) {
+        setSaveMessage('No se encontró razón social para el RUC.');
+        setSaveMessageType('error');
+        return;
+      }
+      setInstitucionValue(razon);
+    } catch (error) {
+      setSaveMessage('No se pudo consultar el RUC. Intente nuevamente.');
+      setSaveMessageType('error');
+    } finally {
+      setIsSearchingRuc(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!idHojaVida) {
       return;
     }
+    setSaveMessage('Guardando...');
+    setSaveMessageType(null);
     const formData = new FormData(e.target as HTMLFormElement);
+    const carreraValue = String(formData.get('carrera') || '').trim();
+    const hasArchivo = !documentoEliminado && Boolean(documentoFile || documentoPreview);
+    const missingFields: string[] = [];
+    if (!tipoInstitucion) missingFields.push('Tipo de institución');
+    if (!tipoEntidad) missingFields.push('Tipo de entidad');
+    if (!nivelEstudio) missingFields.push('Nivel de estudio');
+    if (!carreraValue) missingFields.push('Carrera');
+    if (!fechaValue) missingFields.push('Extensión del diploma');
+    if (!institucionValue.trim()) missingFields.push('Institución');
+
+    if (isNacional) {
+      if (!rucValue.trim()) missingFields.push('RUC');
+      if (!distritoValue) missingFields.push('Ubigeo');
+    } else if (isInternacional) {
+      if (!paisValue) missingFields.push('País');
+    }
+
+    if (!hasArchivo) missingFields.push('Documento de evidencia');
+
+    if (missingFields.length > 0) {
+      setSaveMessage(`Complete los campos obligatorios: ${missingFields.join(', ')}.`);
+      setSaveMessageType('error');
+      return;
+    }
     const nuevaFormacion: Omit<Formacion, 'id'> = {
       nivelEstudio,
-      carrera: formData.get('carrera') as string,
+      carrera: carreraValue,
       tipoInstitucion,
       tipoEntidad,
-      institucion: formData.get('institucion') as string,
+      institucion: institucionValue,
       fecha: fechaValue,
       documento: documentoPreview || '',
     };
 
     if (isNacional) {
-      nuevaFormacion.ruc = formData.get('ruc') as string;
+      nuevaFormacion.ruc = rucValue.trim();
       nuevaFormacion.distrito = distritoValue;
     } else {
       nuevaFormacion.pais = paisValue;
     }
 
-    const hasArchivo = !documentoEliminado && Boolean(documentoFile || documentoPreview);
     const payload = {
       idHvFormacion: Number(formacion?.id || 0),
       idHojaVida,
@@ -287,6 +385,8 @@ export function FormacionForm({
 
     const idHvFormacion = await upsertHvForm(payload);
     if (!idHvFormacion) {
+      setSaveMessage('No se pudo guardar la formación.');
+      setSaveMessageType('error');
       return;
     }
 
@@ -316,6 +416,8 @@ export function FormacionForm({
       await saveHvRefArchivo(documentoFile, payloadArchivo);
     }
 
+    setSaveMessage('Formación guardada correctamente.');
+    setSaveMessageType('success');
     onGuardar();
   };
 
@@ -348,7 +450,9 @@ export function FormacionForm({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="tipoInstitucion">Tipo de institución</Label>
+            <Label htmlFor="tipoInstitucion">
+              Tipo de institución <span className="text-red-500">*</span>
+            </Label>
             <Select
               name="tipoInstitucion"
               value={tipoInstitucion || undefined}
@@ -368,7 +472,9 @@ export function FormacionForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tipoEntidad">Tipo de Entidad</Label>
+            <Label htmlFor="tipoEntidad">
+              Tipo de Entidad <span className="text-red-500">*</span>
+            </Label>
             <Select name="tipoEntidad" value={tipoEntidad || undefined} onValueChange={(value) => setTipoEntidad(value)}>
               <SelectTrigger id="tipoEntidad">
                 <SelectValue placeholder="Seleccione" />
@@ -386,7 +492,9 @@ export function FormacionForm({
           {isNacional && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="ruc">RUC</Label>
+                <Label htmlFor="ruc">
+                  RUC <span className="text-red-500">*</span>
+                </Label>
                 <div className="flex gap-2">
                   <Input
                     id="ruc"
@@ -394,39 +502,53 @@ export function FormacionForm({
                     type="text"
                     placeholder=""
                     maxLength={11}
-                    defaultValue={formacion?.ruc || ''}
+                    value={rucValue}
+                    onChange={(e) => setRucValue(e.target.value)}
                   />
-                  <Button type="button" variant="outline" className="gap-2 whitespace-nowrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2 whitespace-nowrap"
+                    onClick={handleBuscarRuc}
+                    disabled={isSearchingRuc}
+                  >
                     <Search className="w-4 h-4" />
-                    Buscar
+                    {isSearchingRuc ? 'Buscando...' : 'Buscar'}
                   </Button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="institucion">Institución</Label>
+                <Label htmlFor="institucion">
+                  Institución <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="institucion"
                   name="institucion"
                   type="text"
                   placeholder=""
-                  defaultValue={formacion?.institucion || ''}
+                  value={institucionValue}
+                  onChange={(e) => setInstitucionValue(e.target.value)}
                 />
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="distrito">Ubigeo (Departamento / Provincia / Distrito)</Label>
-                <Select
-                  name="distrito"
-                  value={distritoValue}
-                  onValueChange={(value) => {
-                    setDistritoValue(value);
-                    const selected = ubigeoOptions.find((item) => String(item.id) === value);
-                    if (selected) {
-                      setUbigeoQuery(selected.descripcion);
-                    }
-                  }}
-                >
+                <Label htmlFor="distrito">
+                  Ubigeo (Departamento / Provincia / Distrito) <span className="text-red-500">*</span>
+                </Label>
+            <Select
+              name="distrito"
+              value={distritoValue}
+              onValueChange={(value) => {
+                setDistritoValue(value);
+                const selected = ubigeoOptions.find((item) => String(item.id) === value);
+                if (selected) {
+                  setUbigeoQuery(selected.descripcion);
+                } else if (value) {
+                  setUbigeoQuery(value);
+                }
+              }}
+            >
                   <SelectTrigger id="distrito">
                     <SelectValue placeholder="Buscar ubigeo" />
                   </SelectTrigger>
@@ -473,46 +595,59 @@ export function FormacionForm({
                         </Button>
                       </div>
                     </div>
-                    {ubigeoQuery.trim().length < 3 ? (
-                      <SelectItem value="min" disabled>
-                        Ingrese al menos 3 caracteres
+                {ubigeoQuery.trim().length < 3 ? (
+                  <SelectItem value="min" disabled>
+                    Ingrese al menos 3 caracteres
+                  </SelectItem>
+                ) : isUbigeoLoading ? (
+                  <SelectItem value="loading" disabled>
+                    Buscando...
+                  </SelectItem>
+                ) : ubigeoOptions.length === 0 ? (
+                  <>
+                    {/^\d{6}$/.test(ubigeoQuery.trim()) ? (
+                      <SelectItem value={ubigeoQuery.trim()}>
+                        Usar codigo {ubigeoQuery.trim()}
                       </SelectItem>
-                    ) : isUbigeoLoading ? (
-                      <SelectItem value="loading" disabled>
-                        Buscando...
-                      </SelectItem>
-                    ) : ubigeoOptions.length === 0 ? (
+                    ) : (
                       <SelectItem value="empty" disabled>
                         Sin resultados
                       </SelectItem>
-                    ) : (
-                      ubigeoOptions.map((item) => (
-                        <SelectItem key={item.id} value={String(item.id)}>
-                          {item.descripcion}
-                        </SelectItem>
-                      ))
                     )}
-                  </SelectContent>
-                </Select>
-              </div>
+                  </>
+                ) : (
+                  ubigeoOptions.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.descripcion}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
             </>
           )}
 
           {isInternacional && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="institucion">Nombre de institución</Label>
+                <Label htmlFor="institucion">
+                  Nombre de institución <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="institucion"
                   name="institucion"
                   type="text"
                   placeholder=""
-                  defaultValue={formacion?.institucion || ''}
+                  value={institucionValue}
+                  onChange={(e) => setInstitucionValue(e.target.value)}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="pais">País</Label>
+                <Label htmlFor="pais">
+                  País <span className="text-red-500">*</span>
+                </Label>
                 <Select
                   name="pais"
                   value={paisValue || undefined}
@@ -590,7 +725,9 @@ export function FormacionForm({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="nivelEstudio">Nivel de estudio</Label>
+            <Label htmlFor="nivelEstudio">
+              Nivel de estudio <span className="text-red-500">*</span>
+            </Label>
             <Select name="nivelEstudio" value={nivelEstudio || undefined} onValueChange={(value) => setNivelEstudio(value)}>
               <SelectTrigger id="nivelEstudio">
                 <SelectValue placeholder="Seleccione" />
@@ -606,7 +743,9 @@ export function FormacionForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="carrera">Carrera</Label>
+            <Label htmlFor="carrera">
+              Carrera <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="carrera"
               name="carrera"
@@ -617,7 +756,9 @@ export function FormacionForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="fecha">Extensión del Diploma (dd/mm/aaaa)</Label>
+            <Label htmlFor="fecha">
+              Extensión del Diploma (dd/mm/aaaa) <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="fecha"
               name="fecha"
@@ -629,7 +770,9 @@ export function FormacionForm({
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="documento-formacion">Documento de evidencia</Label>
+            <Label htmlFor="documento-formacion">
+              Documento de evidencia <span className="text-red-500">*</span>
+            </Label>
             <div className="space-y-2">
               <label
                 htmlFor="documento-formacion"
@@ -683,7 +826,20 @@ export function FormacionForm({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+        <div className="flex flex-col gap-3 pt-4 border-t border-gray-200 md:flex-row md:items-center md:justify-end">
+          {saveMessage && (
+            <p
+              className={`text-sm ${
+                saveMessageType === 'error'
+                  ? 'text-red-700'
+                  : saveMessageType === 'success'
+                    ? 'text-green-800'
+                    : 'text-gray-600'
+              }`}
+            >
+              {saveMessage}
+            </p>
+          )}
           <Button type="button" variant="outline" onClick={onCancelar}>
             Cancelar
           </Button>

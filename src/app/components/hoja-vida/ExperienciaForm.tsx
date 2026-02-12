@@ -1,10 +1,11 @@
-import { Upload, Eye, X, Save } from 'lucide-react';
+import { Upload, Eye, X, Save, Search } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Button } from '../ui/button';
+import { Checkbox } from '../ui/checkbox';
 import { useEffect, useRef, useState } from 'react';
 import {
   fetchMotivoCeseDropdown,
@@ -15,6 +16,7 @@ import {
 } from '../../api/catalogos';
 import { upsertHvExp } from '../../api/hojaVida';
 import { deleteHvRefArchivo, fetchHvRefArchivo, saveHvRefArchivo } from '../../api/hvRefArchivo';
+import { pedirRUC } from '../../api/pide';
 
 interface Experiencia {
   id?: string;
@@ -23,6 +25,7 @@ interface Experiencia {
   tipoEntidad: string;
   tipoEntidadId?: string;
   nombreEntidad: string;
+  ruc?: string;
   distritoId?: string;
   distritoDescripcion?: string;
   area: string;
@@ -33,6 +36,7 @@ interface Experiencia {
   fechaInicio: string;
   fechaFin: string;
   certificadoPreview: string | null;
+  experienciaEspecifica?: boolean;
 }
 
 interface ExperienciaFormProps {
@@ -40,6 +44,7 @@ interface ExperienciaFormProps {
   experiencia: Experiencia | null;
   idHojaVida: number;
   usuarioAccion: number;
+  rucPersona?: string;
   onGuardar: () => void;
   onCancelar: () => void;
 }
@@ -49,12 +54,19 @@ export function ExperienciaForm({
   experiencia,
   idHojaVida,
   usuarioAccion,
+  rucPersona,
   onGuardar,
   onCancelar,
 }: ExperienciaFormProps) {
   const [tipoExperiencia, setTipoExperiencia] = useState<string>(experiencia?.tipoExperienciaId || '');
   const [tipoEntidad, setTipoEntidad] = useState<string>(experiencia?.tipoEntidadId || '');
   const [motivoCese, setMotivoCese] = useState(experiencia?.motivoCeseId || '');
+  const [nombreEntidadValue, setNombreEntidadValue] = useState<string>(experiencia?.nombreEntidad || '');
+  const [rucValue, setRucValue] = useState<string>(rucPersona || experiencia?.ruc || '');
+  const [experienciaEspecifica, setExperienciaEspecifica] = useState<boolean>(
+    Boolean(experiencia?.experienciaEspecifica),
+  );
+  const [isSearchingRuc, setIsSearchingRuc] = useState(false);
   const [fechaInicioValue, setFechaInicioValue] = useState(experiencia?.fechaInicio || '');
   const [fechaFinValue, setFechaFinValue] = useState(experiencia?.fechaFin || '');
   const [distritoValue, setDistritoValue] = useState<string>(experiencia?.distritoId || '');
@@ -87,6 +99,29 @@ export function ExperienciaForm({
     if (byId) return String(byId.id);
     const byDesc = options.find((item) => item.descripcion.toLowerCase() === normalized);
     return byDesc ? String(byDesc.id) : '';
+  };
+
+  const pickValue = (data: any, keys: string[]) => {
+    if (!data) return '';
+    for (const key of keys) {
+      const value = data?.[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return '';
+  };
+
+  const extractPayload = (data: any) => {
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    }
+    if (data?.datosPrincipales) return data.datosPrincipales;
+    if (data?.data?.datosPrincipales) return data.data.datosPrincipales;
+    if (data?.resultado?.datosPrincipales) return data.resultado.datosPrincipales;
+    if (data?.data) return data.data;
+    if (data?.resultado) return data.resultado;
+    return data ?? {};
   };
   const motivoCeseDescripcion = motivoCeseOptions.find(
     (item) => String(item.id) === motivoCese,
@@ -176,6 +211,9 @@ export function ExperienciaForm({
       setTipoExperiencia('');
       setTipoEntidad('');
       setMotivoCese('');
+      setNombreEntidadValue('');
+      setRucValue('');
+      setExperienciaEspecifica(false);
       setDistritoValue('');
       setUbigeoQuery('');
       setPendingUbigeoId('');
@@ -186,6 +224,9 @@ export function ExperienciaForm({
       setSaveMessageType(null);
       setFechaInicioValue('');
       setFechaFinValue('');
+      if (rucPersona) {
+        setRucValue(rucPersona);
+      }
       return;
     }
 
@@ -198,6 +239,9 @@ export function ExperienciaForm({
     setMotivoCese(
       resolveDropdownValue(experiencia?.motivoCeseId || experiencia?.motivoCese || '', motivoCeseOptions),
     );
+    setNombreEntidadValue(experiencia?.nombreEntidad || '');
+    setRucValue(rucPersona || experiencia?.ruc || '');
+    setExperienciaEspecifica(Boolean(experiencia?.experienciaEspecifica));
     const distritoId = String(experiencia?.distritoId || '');
     const distritoDesc = experiencia?.distritoDescripcion || '';
     setDistritoValue('');
@@ -210,7 +254,7 @@ export function ExperienciaForm({
     setSaveMessageType(null);
     setFechaInicioValue(experiencia?.fechaInicio || '');
     setFechaFinValue(experiencia?.fechaFin || '');
-  }, [modo, experiencia, tipoExperienciaOptions, tipoEntidadOptions, motivoCeseOptions]);
+  }, [modo, experiencia, tipoExperienciaOptions, tipoEntidadOptions, motivoCeseOptions, rucPersona]);
 
   const handleDocumentoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -233,6 +277,56 @@ export function ExperienciaForm({
     }
   };
 
+  const buscarRuc = async (value: string) => {
+    setSaveMessage(null);
+    setSaveMessageType(null);
+    if (!value.trim()) {
+      setSaveMessage('Ingrese el número de RUC.');
+      setSaveMessageType('error');
+      return;
+    }
+    try {
+      setIsSearchingRuc(true);
+      const data = await pedirRUC(value.trim());
+      const payload = extractPayload(data);
+      const razon =
+        pickValue(payload, [
+          'razonSocial',
+          'razon_social',
+          'nombre_o_razon_social',
+          'razonSocialEmpresa',
+          'nombreORazonSocial',
+          'nombre',
+        ]) ||
+        pickValue(data, ['razonSocial', 'razon_social', 'nombre_o_razon_social']);
+      if (!razon) {
+        setSaveMessage('No se encontró razón social para el RUC.');
+        setSaveMessageType('error');
+        return;
+      }
+      setNombreEntidadValue(razon);
+    } catch (error) {
+      setSaveMessage('No se pudo consultar el RUC. Intente nuevamente.');
+      setSaveMessageType('error');
+    } finally {
+      setIsSearchingRuc(false);
+    }
+  };
+
+  const handleBuscarRuc = async () => {
+    await buscarRuc(rucValue.trim());
+  };
+
+  useEffect(() => {
+    if (!rucPersona) return;
+    const normalized = rucPersona.trim();
+    if (!normalized) return;
+    setRucValue(normalized);
+    if (!nombreEntidadValue) {
+      buscarRuc(normalized);
+    }
+  }, [rucPersona, nombreEntidadValue]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!idHojaVida) {
@@ -244,21 +338,45 @@ export function ExperienciaForm({
     }
     setSaveMessage('Guardando...');
     setSaveMessageType(null);
-    const formData = new FormData(e.target as HTMLFormElement);
     const hasArchivo = !documentoEliminado && Boolean(certificadoFile || certificadoPreview);
+    const missingFields: string[] = [];
+    if (!tipoExperiencia) missingFields.push('Tipo de experiencia');
+    if (!tipoEntidad) missingFields.push('Tipo de entidad');
+    if (!rucValue.trim()) missingFields.push('RUC');
+    if (!nombreEntidadValue.trim()) missingFields.push('Nombre de la entidad');
+    if (!distritoValue) missingFields.push('Ubigeo');
+    const formData = new FormData(e.target as HTMLFormElement);
+    const areaValue = String(formData.get('area') || '').trim();
+    const cargoValue = String(formData.get('cargo') || '').trim();
+    const funcionesValue = String(formData.get('funcionesPrincipales') || '').trim();
+    if (!areaValue) missingFields.push('Área');
+    if (!cargoValue) missingFields.push('Cargo');
+    if (!funcionesValue) missingFields.push('Funciones principales');
+    if (!motivoCese) missingFields.push('Motivo de cese');
+    if (!fechaInicioValue) missingFields.push('Fecha inicio');
+    if (!isActualidad && !fechaFinValue) missingFields.push('Fecha fin');
+    if (!hasArchivo) missingFields.push('Certificado de trabajo');
+
+    if (missingFields.length > 0) {
+      setSaveMessage(`Complete los campos obligatorios: ${missingFields.join(', ')}.`);
+      setSaveMessageType('error');
+      return;
+    }
     const nuevaExperiencia: Omit<Experiencia, 'id'> = {
       tipoExperiencia: tipoExperiencia,
       tipoEntidad: tipoEntidad,
-      nombreEntidad: formData.get('nombreEntidad') as string,
+      nombreEntidad: nombreEntidadValue,
+      ruc: rucValue.trim(),
       distritoId: distritoValue,
       distritoDescripcion: ubigeoQuery,
-      area: formData.get('area') as string,
-      cargo: formData.get('cargo') as string,
-      funcionesPrincipales: formData.get('funcionesPrincipales') as string,
+      area: areaValue,
+      cargo: cargoValue,
+      funcionesPrincipales: funcionesValue,
       motivoCese: motivoCese,
       fechaInicio: fechaInicioValue,
       fechaFin: isActualidad ? '' : fechaFinValue,
       certificadoPreview: certificadoPreview,
+      experienciaEspecifica: experienciaEspecifica,
     };
 
     if (!isActualidad && nuevaExperiencia.fechaInicio && nuevaExperiencia.fechaFin) {
@@ -296,6 +414,7 @@ export function ExperienciaForm({
       fechaInicio: nuevaExperiencia.fechaInicio,
       fechaFin: nuevaExperiencia.fechaFin,
       idArchivo: hasArchivo ? 1 : 0,
+      experienciaEspecifica: experienciaEspecifica ? 1 : 0,
       usuarioAccion,
     };
 
@@ -377,7 +496,9 @@ export function ExperienciaForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Tipo de experiencia */}
           <div className="space-y-2">
-            <Label htmlFor="tipoExperiencia">Tipo de experiencia</Label>
+            <Label htmlFor="tipoExperiencia">
+              Tipo de experiencia <span className="text-red-500">*</span>
+            </Label>
             <Select
               name="tipoExperiencia"
               value={tipoExperiencia || undefined}
@@ -398,7 +519,9 @@ export function ExperienciaForm({
 
           {/* Tipo de Entidad */}
           <div className="space-y-2">
-            <Label htmlFor="tipoEntidad">Tipo de Entidad</Label>
+            <Label htmlFor="tipoEntidad">
+              Tipo de Entidad <span className="text-red-500">*</span>
+            </Label>
             <Select
               name="tipoEntidad"
               value={tipoEntidad || undefined}
@@ -419,19 +542,52 @@ export function ExperienciaForm({
 
           {/* Nombre de la entidad */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="nombreEntidad">Nombre de la entidad</Label>
+            <Label htmlFor="rucExperiencia">
+              RUC <span className="text-red-500">*</span>
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="rucExperiencia"
+                name="rucExperiencia"
+                type="text"
+                placeholder=""
+                maxLength={11}
+                value={rucValue}
+                onChange={(e) => setRucValue(e.target.value)}
+                readOnly={Boolean(rucPersona)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2 whitespace-nowrap"
+                onClick={handleBuscarRuc}
+                disabled={isSearchingRuc}
+              >
+                <Search className="w-4 h-4" />
+                {isSearchingRuc ? 'Buscando...' : 'Buscar'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="nombreEntidad">
+              Nombre de la entidad <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="nombreEntidad"
               name="nombreEntidad"
               type="text"
-              defaultValue={experiencia?.nombreEntidad || ''}
+              value={nombreEntidadValue}
+              onChange={(e) => setNombreEntidadValue(e.target.value)}
               placeholder=""
             />
           </div>
 
           {/* Ubigeo */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="distrito">Ubigeo (Departamento / Provincia / Distrito)</Label>
+            <Label htmlFor="distrito">
+              Ubigeo (Departamento / Provincia / Distrito) <span className="text-red-500">*</span>
+            </Label>
             <Select
               name="distrito"
               value={distritoValue}
@@ -440,6 +596,8 @@ export function ExperienciaForm({
                 const selected = ubigeoOptions.find((item) => String(item.id) === value);
                 if (selected) {
                   setUbigeoQuery(selected.descripcion);
+                } else if (value) {
+                  setUbigeoQuery(value);
                 }
               }}
             >
@@ -498,9 +656,17 @@ export function ExperienciaForm({
                     Buscando...
                   </SelectItem>
                 ) : ubigeoOptions.length === 0 ? (
-                  <SelectItem value="empty" disabled>
-                    Sin resultados
-                  </SelectItem>
+                  <>
+                    {/^\d{6}$/.test(ubigeoQuery.trim()) ? (
+                      <SelectItem value={ubigeoQuery.trim()}>
+                        Usar codigo {ubigeoQuery.trim()}
+                      </SelectItem>
+                    ) : (
+                      <SelectItem value="empty" disabled>
+                        Sin resultados
+                      </SelectItem>
+                    )}
+                  </>
                 ) : (
                   ubigeoOptions.map((item) => (
                     <SelectItem key={item.id} value={String(item.id)}>
@@ -514,7 +680,9 @@ export function ExperienciaForm({
 
           {/* Área */}
           <div className="space-y-2">
-            <Label htmlFor="area">Área</Label>
+            <Label htmlFor="area">
+              Área <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="area"
               name="area"
@@ -526,7 +694,9 @@ export function ExperienciaForm({
 
           {/* Cargo */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="cargo">Cargo</Label>
+            <Label htmlFor="cargo">
+              Cargo <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="cargo"
               name="cargo"
@@ -538,7 +708,9 @@ export function ExperienciaForm({
 
           {/* Funciones principales */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="funcionesPrincipales">Funciones principales</Label>
+            <Label htmlFor="funcionesPrincipales">
+              Funciones principales <span className="text-red-500">*</span>
+            </Label>
             <Textarea
               id="funcionesPrincipales"
               name="funcionesPrincipales"
@@ -552,7 +724,9 @@ export function ExperienciaForm({
 
           {/* Motivo de cese */}
           <div className="space-y-2">
-            <Label htmlFor="motivoCese">Motivo de cese</Label>
+            <Label htmlFor="motivoCese">
+              Motivo de cese <span className="text-red-500">*</span>
+            </Label>
             <Select
               name="motivoCese"
               value={motivoCese || undefined}
@@ -573,7 +747,9 @@ export function ExperienciaForm({
 
           {/* Fecha inicio */}
           <div className="space-y-2">
-            <Label htmlFor="fechaInicio">Fecha inicio</Label>
+            <Label htmlFor="fechaInicio">
+              Fecha inicio <span className="text-red-500">*</span>
+            </Label>
           <Input
               id="fechaInicio"
               name="fechaInicio"
@@ -588,7 +764,9 @@ export function ExperienciaForm({
           {/* Fecha fin - Solo si NO es "Hasta la actualidad" */}
           {!isActualidad && (
             <div className="space-y-2">
-              <Label htmlFor="fechaFin">Fecha fin</Label>
+              <Label htmlFor="fechaFin">
+                Fecha fin <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="fechaFin"
                 name="fechaFin"
@@ -601,9 +779,22 @@ export function ExperienciaForm({
             </div>
           )}
 
+          <div className="flex items-center gap-2 md:col-span-2">
+            <Checkbox
+              id="experienciaEspecifica"
+              checked={experienciaEspecifica}
+              onCheckedChange={(checked) => setExperienciaEspecifica(Boolean(checked))}
+            />
+            <Label htmlFor="experienciaEspecifica" className="text-sm">
+              Esta experiencia también cuenta como experiencia específica
+            </Label>
+          </div>
+
           {/* Certificado de trabajo */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="certificado-experiencia">Certificado de trabajo</Label>
+            <Label htmlFor="certificado-experiencia">
+              Certificado de trabajo <span className="text-red-500">*</span>
+            </Label>
             <div className="space-y-2">
               <label
                 htmlFor="certificado-experiencia"

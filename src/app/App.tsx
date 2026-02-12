@@ -1,6 +1,8 @@
 ﻿import { Filter, GraduationCap, Briefcase, Eye, Send, ChevronLeft, ChevronRight, Save, FileText, User, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner';
 import { Sidebar } from './components/Sidebar';
 import { FilterCard } from './components/FilterCard';
 import { ConvocatoriasTable } from './components/ConvocatoriasTable';
@@ -289,6 +291,7 @@ export default function App() {
     ? 'recovery'
     : 'login';
   const storedAuth = loadStoredAuthState();
+  const toaster = <Toaster position="top-right" richColors />;
   // Estado para definir si es usuario normal o admin
   const [userType, setUserType] = useState<'postulante' | 'admin' | null>(
     storedAuth.userType ?? initialUserType,
@@ -337,6 +340,28 @@ export default function App() {
   const [adminUserId, setAdminUserId] = useState<number>(
     storedAuth.adminAuth?.userId ?? 0,
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = sessionStorage.getItem('sirpo.toast');
+    if (!raw) return;
+    sessionStorage.removeItem('sirpo.toast');
+    try {
+      const parsed = JSON.parse(raw) as { type?: string; message?: string };
+      const message = parsed?.message || '';
+      if (!message) return;
+      const type = (parsed?.type || '').toLowerCase();
+      if (type === 'success') {
+        toast.success(message);
+      } else if (type === 'warning') {
+        toast.warning(message);
+      } else {
+        toast.error(message);
+      }
+    } catch {
+      toast.error('Tu sesión expiró. Inicia sesión nuevamente.');
+    }
+  }, []);
 
   const persistPostulanteAuth = (user: LoginResponse, remember: boolean) => {
     if (typeof window === 'undefined') return;
@@ -853,97 +878,116 @@ export default function App() {
   if (!isAuthenticated) {
     if (userType === null) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl p-8 shadow-xl">
-            <div className="text-center mb-3">
-              <h1
-                className="text-3xl font-bold mb-1 flex items-center justify-center gap-2"
-                style={{ color: '#04a25c' }}
-              >
-                <Users className="w-8 h-8" />
-                SIRPO
-              </h1>
-              <p className="text-lg font-bold" style={{ color: '#108cc9' }}>
-                SISTEMA DE REGISTRO DE PROFESIONALES Y/O TÉCNICOS PARA TRABAJO DE CAMPO EN EL MARCO DEL PP PIRDAIS
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <button
-                onClick={() => {
-                  setUserType('postulante');
-                  navigate('/login');
-                }}
-                className="group p-8 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:shadow-lg transition-all duration-200 text-center"
-              >
-                <div className="w-20 h-20 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                  <User className="w-10 h-10 text-green-600" />
-                </div>
-                <h3 className="text-xl font-bold mb-2 text-gray-800">Usuario</h3>
-                <p className="text-sm text-gray-600">
-                  Accede para registrar tu hoja de vida
+        <>
+          {toaster}
+          <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-2xl p-8 shadow-xl">
+              <div className="text-center mb-3">
+                <h1
+                  className="text-3xl font-bold mb-1 flex items-center justify-center gap-2"
+                  style={{ color: '#04a25c' }}
+                >
+                  <Users className="w-8 h-8" />
+                  SIRPO
+                </h1>
+                <p className="text-lg font-bold" style={{ color: '#108cc9' }}>
+                  SISTEMA DE REGISTRO DE PROFESIONALES Y/O TÉCNICOS PARA TRABAJO DE CAMPO EN EL MARCO DEL PP PIRDAIS
                 </p>
-              </button>
+              </div>
 
-              <button
-                onClick={() => {
-                  setUserType('admin');
-                  navigate('/admin/login');
-                }}
-                className="group p-8 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-lg transition-all duration-200 text-center"
-              >
-                <div className="w-20 h-20 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                  <Shield className="w-10 h-10 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-bold mb-2 text-gray-800">Administrador</h3>
-                <p className="text-sm text-gray-600">
-                  Accede al panel administrativo de DEVIDA
-                </p>
-              </button>
-            </div>
-          </Card>
-        </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => {
+                    setUserType('postulante');
+                    navigate('/login');
+                  }}
+                  className="group p-8 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:shadow-lg transition-all duration-200 text-center"
+                >
+                  <div className="w-20 h-20 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                    <User className="w-10 h-10 text-green-600" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-gray-800">Usuario</h3>
+                  <p className="text-sm text-gray-600">
+                    Accede para registrar tu hoja de vida
+                  </p>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setUserType('admin');
+                    navigate('/admin/login');
+                  }}
+                  className="group p-8 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-lg transition-all duration-200 text-center"
+                >
+                  <div className="w-20 h-20 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                    <Shield className="w-10 h-10 text-blue-600" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-gray-800">Administrador</h3>
+                  <p className="text-sm text-gray-600">
+                    Accede al panel administrativo de DEVIDA
+                  </p>
+                </button>
+              </div>
+            </Card>
+          </div>
+        </>
       );
     }
 
     // Login de Administrador
     if (userType === 'admin') {
       return (
-        <AdminLogin
-          onLogin={(role, username, adminId, token) => {
-            handleAdminLogin(role, username, adminId, token);
-          }}
-        />
+        <>
+          {toaster}
+          <AdminLogin
+            onLogin={(role, username, adminId, token) => {
+              handleAdminLogin(role, username, adminId, token);
+            }}
+          />
+        </>
       );
     }
 
     // Login/Registro de Postulante
     if (authView === 'register') {
       return (
-        <RegisterForm
-          onRegister={handleRegister}
-          onNavigateToLogin={() => navigate('/login')}
-        />
+        <>
+          {toaster}
+          <RegisterForm
+            onRegister={handleRegister}
+            onNavigateToLogin={() => navigate('/login')}
+          />
+        </>
       );
     }
 
     if (authView === 'recovery') {
-      return <RecoveryForm onNavigateToLogin={() => navigate('/login')} />;
+      return (
+        <>
+          {toaster}
+          <RecoveryForm onNavigateToLogin={() => navigate('/login')} />
+        </>
+      );
     }
 
     return (
-      <LoginForm
-        onLogin={handleLogin}
-        onNavigateToRegister={() => navigate('/registroUsuario')}
-        onNavigateToRecovery={() => navigate('/recuperarContrasena')}
-      />
+      <>
+        {toaster}
+        <LoginForm
+          onLogin={handleLogin}
+          onNavigateToRegister={() => navigate('/registroUsuario')}
+          onNavigateToRecovery={() => navigate('/recuperarContrasena')}
+        />
+      </>
     );
   }
 
   // Panel Administrativo
   if (userType === 'admin') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <>
+        {toaster}
+        <div className="min-h-screen bg-gray-50">
         <AdminSidebar 
           activeSection={adminSection} 
           onNavigate={(section) => {
@@ -968,13 +1012,16 @@ export default function App() {
           {adminSection === 'plantillas' && <PlantillasCorreo />}
           {adminSection === 'usuarios' && <GestionUsuariosAdmin adminUserId={adminUserId} />}
         </main>
-      </div>
+        </div>
+      </>
     );
   }
 
   // Panel de Postulantes (código existente)
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      {toaster}
+      <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
       <Sidebar 
         activeSection={activeSection} 
@@ -1259,7 +1306,8 @@ export default function App() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

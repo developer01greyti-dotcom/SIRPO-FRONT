@@ -45,6 +45,7 @@ interface Experiencia {
   tipoExperiencia: string;
   tipoEntidad: string;
   nombreEntidad: string;
+  ruc?: string;
   departamento?: string;
   provincia?: string;
   distrito?: string;
@@ -55,6 +56,7 @@ interface Experiencia {
   fechaInicio: string;
   fechaFin: string;
   certificadoPreview: string | null;
+  experienciaEspecifica?: boolean;
 }
 
 interface Declaracion {
@@ -335,6 +337,11 @@ export function VistaPrevia({
             fechaInicio: item.fechaInicio ?? '',
             fechaFin: item.fechaFin ?? '',
             certificadoPreview: item.archivoGuid ? buildFileUrl(String(item.archivoGuid)) : null,
+            experienciaEspecifica:
+              item.experienciaEspecifica ??
+              item.experiencia_especifica ??
+              item.especifica ??
+              false,
           })),
         );
 
@@ -392,6 +399,113 @@ export function VistaPrevia({
     return labels[motivo] || motivo;
   };
 
+  const renderExperiencias = (items: Experiencia[], emptyText: string) => {
+    if (items.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">{emptyText}</p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-6">
+        {items.map((exp, index) => (
+          <div key={`${exp.id}-${index}`}>
+            {index > 0 && <Separator className="my-6" />}
+            <div className="relative pl-6 border-l-4 border-teal-600">
+              <div className="absolute -left-2 top-0 w-4 h-4 bg-teal-600 rounded-full"></div>
+
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h5 className="text-base font-semibold text-gray-900">
+                      {exp.cargo || 'Sin cargo'}
+                    </h5>
+                    <p className="text-sm text-teal-600 font-medium">{exp.nombreEntidad || 'Sin entidad'}</p>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full flex-shrink-0">
+                    <Calendar className="w-3 h-3 text-gray-500" />
+                    <span className="text-xs font-medium text-gray-700">
+                      {exp.fechaInicio && exp.fechaFin
+                        ? `${formatFecha(exp.fechaInicio)} - ${exp.motivoCese === 'actualidad' ? 'Actualidad' : formatFecha(exp.fechaFin)}`
+                        : 'Sin fechas'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Tipo de Experiencia</p>
+                    <p className="text-sm font-medium text-gray-900">{getTipoExperienciaLabel(exp.tipoExperiencia)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Tipo de Entidad</p>
+                    <p className="text-sm font-medium text-gray-900">{getTipoEntidadLabel(exp.tipoEntidad)}</p>
+                  </div>
+                  {exp.area && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">Área</p>
+                      <p className="text-sm font-medium text-gray-900">{exp.area}</p>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Motivo de Cese</p>
+                    <p className="text-sm font-medium text-gray-900">{getMotivoCeseLabel(exp.motivoCese)}</p>
+                  </div>
+                </div>
+
+                {(exp.departamento || exp.provincia || exp.distrito) && (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1 flex-1">
+                      <p className="text-xs text-gray-500">Ubigeo</p>
+                      <p className="text-sm text-gray-600">
+                        {formatUbigeo(exp.departamento, exp.provincia, exp.distrito)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {exp.funcionesPrincipales && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Funciones Principales:</p>
+                    <p className="text-sm text-gray-700 leading-relaxed">{exp.funcionesPrincipales}</p>
+                  </div>
+                )}
+
+                {exp.certificadoPreview && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="inline-flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium">
+                      <FileText className="w-3 h-3" />
+                      Certificado adjuntado
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => previewFile(exp.certificadoPreview)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors print:hidden"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Ver
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadFile(exp.certificadoPreview, `experiencia_${exp.id}`)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Descargar
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const datosPersonales = datosPersonalesProp ?? datosPersonalesState ?? {
     tipoDocumento: '',
     estadoCivil: '',
@@ -415,13 +529,25 @@ export function VistaPrevia({
     distrito: '',
   };
 
+  const toBool = (value: any) => {
+    if (value === true || value === 'true' || value === '1') return true;
+    const numeric = Number(value);
+    return !Number.isNaN(numeric) ? numeric > 0 : false;
+  };
+
   const formaciones = formacionesProp ?? formacionesState;
   const cursos = cursosProp ?? cursosState;
-  const experiencias = experienciasProp ?? experienciasState;
+  const experienciasBase = experienciasProp ?? experienciasState;
+  const experiencias = experienciasBase.map((exp) => ({
+    ...exp,
+    experienciaEspecifica: toBool(
+      exp.experienciaEspecifica ?? exp.experiencia_especifica ?? exp.especifica ?? false,
+    ),
+  }));
   const declaraciones = declaracionesProp ?? declaracionesState;
-  const totalExperiencia = (() => {
+  const calcularTotalExperiencia = (items: Experiencia[]) => {
     let totalDays = 0;
-    experiencias.forEach((exp) => {
+    items.forEach((exp) => {
       const start = parseFecha(exp.fechaInicio);
       if (!start) return;
       const motivo = (exp.motivoCese || '').toLowerCase();
@@ -436,7 +562,11 @@ export function VistaPrevia({
     const months = Math.floor((totalDays % 365) / 30);
     const days = totalDays % 30;
     return { years, months, days, totalDays };
-  })();
+  };
+  const experienciasEspecificas = experiencias.filter((exp) => exp.experienciaEspecifica);
+  const experienciasGenerales = experiencias.filter((exp) => !exp.experienciaEspecifica);
+  const totalExperienciaGeneral = calcularTotalExperiencia(experienciasGenerales);
+  const totalExperienciaEspecifica = calcularTotalExperiencia(experienciasEspecificas);
   const hasPersonalData = Boolean(
     datosPersonales.nombres ||
       datosPersonales.apellidoPaterno ||
@@ -949,114 +1079,30 @@ export function VistaPrevia({
             </div>
             <h4 className="text-lg font-bold" style={{ color: '#04a25c' }}>Experiencia Profesional</h4>
           </div>
-          {totalExperiencia.totalDays > 0 && (
+        <div className="flex flex-col gap-3">
+          {totalExperienciaGeneral.totalDays > 0 && (
             <p className="text-sm text-gray-700 whitespace-nowrap">
-              Total de experiencia: {totalExperiencia.years} años, {totalExperiencia.months} meses, {totalExperiencia.days} días
+              Total experiencia general: {totalExperienciaGeneral.years} años, {totalExperienciaGeneral.months} meses, {totalExperienciaGeneral.days} días
+            </p>
+          )}
+          {totalExperienciaEspecifica.totalDays > 0 && (
+            <p className="text-sm text-gray-700 whitespace-nowrap">
+              Total experiencia específica: {totalExperienciaEspecifica.years} años, {totalExperienciaEspecifica.months} meses, {totalExperienciaEspecifica.days} días
             </p>
           )}
         </div>
+      </div>
 
-        {experiencias.length > 0 ? (
-          <div className="space-y-6">
-            {experiencias.map((exp, index) => (
-              <div key={exp.id}>
-                {index > 0 && <Separator className="my-6" />}
-                <div className="relative pl-6 border-l-4 border-teal-600">
-                  <div className="absolute -left-2 top-0 w-4 h-4 bg-teal-600 rounded-full"></div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h5 className="text-base font-semibold text-gray-900">
-                          {exp.cargo || 'Sin cargo'}
-                        </h5>
-                        <p className="text-sm text-teal-600 font-medium">{exp.nombreEntidad || 'Sin entidad'}</p>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full flex-shrink-0">
-                        <Calendar className="w-3 h-3 text-gray-500" />
-                        <span className="text-xs font-medium text-gray-700">
-                          {exp.fechaInicio && exp.fechaFin
-                            ? `${formatFecha(exp.fechaInicio)} - ${exp.motivoCese === 'actualidad' ? 'Actualidad' : formatFecha(exp.fechaFin)}`
-                            : 'Sin fechas'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-xs text-gray-500">Tipo de Experiencia</p>
-                        <p className="text-sm font-medium text-gray-900">{getTipoExperienciaLabel(exp.tipoExperiencia)}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-gray-500">Tipo de Entidad</p>
-                        <p className="text-sm font-medium text-gray-900">{getTipoEntidadLabel(exp.tipoEntidad)}</p>
-                      </div>
-                      {exp.area && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-gray-500">Área</p>
-                          <p className="text-sm font-medium text-gray-900">{exp.area}</p>
-                        </div>
-                      )}
-                      <div className="space-y-1">
-                        <p className="text-xs text-gray-500">Motivo de Cese</p>
-                        <p className="text-sm font-medium text-gray-900">{getMotivoCeseLabel(exp.motivoCese)}</p>
-                      </div>
-                    </div>
-
-                    {(exp.departamento || exp.provincia || exp.distrito) && (
-                      <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <div className="space-y-1 flex-1">
-                          <p className="text-xs text-gray-500">Ubigeo</p>
-                          <p className="text-sm text-gray-600">
-                            {formatUbigeo(exp.departamento, exp.provincia, exp.distrito)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {exp.funcionesPrincipales && (
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-xs text-gray-500 mb-1">Funciones Principales:</p>
-                        <p className="text-sm text-gray-700 leading-relaxed">{exp.funcionesPrincipales}</p>
-                      </div>
-                    )}
-
-                    {exp.certificadoPreview && (
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="inline-flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium">
-                          <FileText className="w-3 h-3" />
-                          Certificado adjuntado
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => previewFile(exp.certificadoPreview)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors print:hidden"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Ver
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadFile(exp.certificadoPreview, `experiencia_${exp.id}`)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Descargar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No se ha registrado experiencia profesional</p>
-          </div>
-        )}
+      <div className="space-y-8">
+        <div>
+          <h5 className="text-base font-semibold text-gray-900 mb-4">Experiencia General</h5>
+          {renderExperiencias(experienciasGenerales, 'No se ha registrado experiencia profesional')}
+        </div>
+        <div>
+          <h5 className="text-base font-semibold text-gray-900 mb-4">Experiencia Específica</h5>
+          {renderExperiencias(experienciasEspecificas, 'No se ha registrado experiencia específica')}
+        </div>
+      </div>
       </Card>
 
       {/* Declaraciones */}

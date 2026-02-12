@@ -231,7 +231,12 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
       ['nacionalidad', 'Nacionalidad'],
       ['correo', 'Correo electrónico principal'],
       ['telefonoCelular', 'Celular'],
+      ['ruc', 'RUC'],
+      ['cuentaBn', 'Nro. cuenta Banco de la Nación'],
       ['cciBn', 'CCI-Banco de la Nación'],
+      ['direccion', 'Dirección'],
+      ['referencia', 'Referencia'],
+      ['distrito', 'Ubigeo'],
     ];
 
     return requiredFields
@@ -808,6 +813,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     if (!user?.idUsuario) {
 
       setSaveMessage('No se encontró el usuario autenticado.');
+      setSaveMessageType('error');
 
       return;
 
@@ -816,6 +822,19 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     const missingRequired = validateRequiredFields();
     if (missingRequired.length > 0) {
       setSaveMessage(`Complete los campos obligatorios: ${missingRequired.join(', ')}.`);
+      setSaveMessageType('error');
+      return;
+    }
+
+    const hasVoucher = !voucherDeleted && Boolean(voucherFile || voucherPreview || voucherRefId || voucherFileUrl);
+    const hasRnp = !rnpDeleted && Boolean(rnpFile || rnpPreview || rnpRefId || rnpFileUrl);
+    const hasSeguro = !seguroDeleted && Boolean(seguroSaludFile || seguroSaludPreview || seguroRefId || seguroFileUrl);
+    const missingFiles: string[] = [];
+    if (!hasVoucher) missingFiles.push('Voucher Banco de la Nación');
+    if (!hasRnp) missingFiles.push('Registro Nacional de Proveedores');
+    if (!hasSeguro) missingFiles.push('Seguro de salud');
+    if (missingFiles.length > 0) {
+      setSaveMessage(`Adjunte los documentos obligatorios: ${missingFiles.join(', ')}.`);
       setSaveMessageType('error');
       return;
     }
@@ -1573,8 +1592,6 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
                   onChange={(e) => updateField('correoSecundario', e.target.value)}
 
-                  required
-
                 />
 
               </div>
@@ -1587,7 +1604,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2">
 
-              <Label htmlFor="ruc">RUC</Label>
+              <Label htmlFor="ruc">RUC *</Label>
 
               <Input
 
@@ -1647,7 +1664,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2 md:col-span-2">
 
-              <Label htmlFor="cuentaBn">Nro cuenta de ahorros-Banco de la Nación</Label>
+              <Label htmlFor="cuentaBn">Nro cuenta de ahorros-Banco de la Nación *</Label>
 
               <div className="relative">
 
@@ -1719,7 +1736,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2 md:col-span-2">
 
-              <Label htmlFor="voucher">Voucher Banco de la Nación</Label>
+              <Label htmlFor="voucher">Voucher Banco de la Nación *</Label>
 
               <div className="space-y-2">
 
@@ -1832,7 +1849,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2 md:col-span-2">
 
-              <Label htmlFor="rnpConstancia">Registro Nacional de Proveedores (constancia)</Label>
+              <Label htmlFor="rnpConstancia">Registro Nacional de Proveedores (constancia) *</Label>
 
               <div className="space-y-2">
 
@@ -1945,7 +1962,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2 md:col-span-2">
 
-              <Label htmlFor="seguroSalud">Seguro de salud</Label>
+              <Label htmlFor="seguroSalud">Seguro de salud *</Label>
 
               <div className="space-y-2">
 
@@ -2195,7 +2212,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2 md:col-span-2">
 
-              <Label htmlFor="direccionDomicilio">Dirección</Label>
+              <Label htmlFor="direccionDomicilio">Dirección *</Label>
 
               <Input
 
@@ -2219,7 +2236,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2 md:col-span-2">
 
-              <Label htmlFor="referenciaDomicilio">Referencia</Label>
+              <Label htmlFor="referenciaDomicilio">Referencia *</Label>
 
               <Input
 
@@ -2243,7 +2260,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
             <div className="space-y-2 md:col-span-2">
 
-              <Label htmlFor="ubigeoSearch">Ubigeo (Departamento / Provincia / Distrito)</Label>
+              <Label htmlFor="ubigeoSearch">Ubigeo (Departamento / Provincia / Distrito) *</Label>
 
               <Select
 
@@ -2260,6 +2277,10 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                   if (selected) {
 
                     setUbigeoQuery(selected.descripcion);
+
+                  } else if (value) {
+
+                    setUbigeoQuery(value);
 
                   }
 
@@ -2371,11 +2392,27 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
                   ) : ubigeoOptions.length === 0 ? (
 
-                    <SelectItem value="empty" disabled>
+                    <>
 
-                      Sin resultados
+                      {/^\d{6}$/.test(ubigeoQuery.trim()) ? (
 
-                    </SelectItem>
+                        <SelectItem value={ubigeoQuery.trim()}>
+
+                          Usar codigo {ubigeoQuery.trim()}
+
+                        </SelectItem>
+
+                      ) : (
+
+                        <SelectItem value="empty" disabled>
+
+                          Sin resultados
+
+                        </SelectItem>
+
+                      )}
+
+                    </>
 
                   ) : (
 

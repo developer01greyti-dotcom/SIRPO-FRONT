@@ -14,6 +14,7 @@ import {
 import { upsertHvCur } from '../../api/hojaVida';
 import { deleteHvRefArchivo, fetchHvRefArchivo, saveHvRefArchivo } from '../../api/hvRefArchivo';
 import { PAISES_CATALOGO } from '../../data/paises';
+import { pedirRUC } from '../../api/pide';
 
 interface Curso {
   id: string;
@@ -60,6 +61,9 @@ export function CursoForm({
   const messageTimeoutRef = useRef<number | null>(null);
   const todayIso = new Date().toISOString().split('T')[0];
   const [tipoInstitucion, setTipoInstitucion] = useState<string>('');
+  const [rucValue, setRucValue] = useState<string>(curso?.ruc || '');
+  const [institucionValue, setInstitucionValue] = useState<string>(curso?.institucion || '');
+  const [isSearchingRuc, setIsSearchingRuc] = useState(false);
   const [tipoEstudio, setTipoEstudio] = useState<string>(curso?.tipoEstudio || '');
   const [distritoValue, setDistritoValue] = useState<string>(curso?.distrito || '');
   const [ubigeoQuery, setUbigeoQuery] = useState<string>(curso?.distrito || '');
@@ -113,6 +117,29 @@ export function CursoForm({
       (item) => item.descripcion.toLowerCase() === normalized,
     );
     return byDesc ? String(byDesc.id) : '';
+  };
+
+  const pickValue = (data: any, keys: string[]) => {
+    if (!data) return '';
+    for (const key of keys) {
+      const value = data?.[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return '';
+  };
+
+  const extractPayload = (data: any) => {
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    }
+    if (data?.datosPrincipales) return data.datosPrincipales;
+    if (data?.data?.datosPrincipales) return data.data.datosPrincipales;
+    if (data?.resultado?.datosPrincipales) return data.resultado.datosPrincipales;
+    if (data?.data) return data.data;
+    if (data?.resultado) return data.resultado;
+    return data ?? {};
   };
 
   useEffect(() => {
@@ -170,6 +197,8 @@ export function CursoForm({
     if (modo === 'crear') {
       setTipoInstitucion('');
       setTipoEstudio('');
+      setRucValue('');
+      setInstitucionValue('');
       setDistritoValue('');
       setUbigeoQuery('');
       setPendingUbigeoId('');
@@ -185,6 +214,8 @@ export function CursoForm({
 
     setTipoInstitucion(resolveTipoInstitucionValue(curso?.tipoInstitucionId || curso?.tipoInstitucion || ''));
     setTipoEstudio(resolveTipoEstudioValue(curso?.tipoEstudioId || curso?.tipoEstudio || ''));
+    setRucValue(curso?.ruc || '');
+    setInstitucionValue(curso?.institucion || '');
     const distritoId = String(curso?.distritoId || '');
     const distritoDesc = curso?.distritoDescripcion || curso?.distrito || '';
     setDistritoValue('');
@@ -252,6 +283,42 @@ export function CursoForm({
     window.open(documentoPreview, '_blank', 'noopener,noreferrer');
   };
 
+  const handleBuscarRuc = async () => {
+    setSaveMessage(null);
+    setSaveMessageType(null);
+    if (!rucValue.trim()) {
+      setSaveMessage('Ingrese el número de RUC.');
+      setSaveMessageType('error');
+      return;
+    }
+    try {
+      setIsSearchingRuc(true);
+      const data = await pedirRUC(rucValue.trim());
+      const payload = extractPayload(data);
+      const razon =
+        pickValue(payload, [
+          'razonSocial',
+          'razon_social',
+          'nombre_o_razon_social',
+          'razonSocialEmpresa',
+          'nombreORazonSocial',
+          'nombre',
+        ]) ||
+        pickValue(data, ['razonSocial', 'razon_social', 'nombre_o_razon_social']);
+      if (!razon) {
+        setSaveMessage('No se encontró razón social para el RUC.');
+        setSaveMessageType('error');
+        return;
+      }
+      setInstitucionValue(razon);
+    } catch (error) {
+      setSaveMessage('No se pudo consultar el RUC. Intente nuevamente.');
+      setSaveMessageType('error');
+    } finally {
+      setIsSearchingRuc(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!idHojaVida) {
@@ -264,16 +331,41 @@ export function CursoForm({
     setSaveMessage('Guardando...');
     setSaveMessageType(null);
     const formData = new FormData(e.target as HTMLFormElement);
+    const descripcionValue = String(formData.get('descripcion') || '').trim();
+    const fechaInicioValue = String(formData.get('fechaInicio') || '').trim();
+    const fechaFinValue = String(formData.get('fechaFin') || '').trim();
+    const horasLectivasValue = String(formData.get('horasLectivas') || '').trim();
+    const hasArchivo = !documentoEliminado && Boolean(documentoFile || documentoPreview);
+    const missingFields: string[] = [];
+    if (!tipoInstitucion) missingFields.push('Tipo de institución');
+    if (!tipoEstudio) missingFields.push('Tipo de estudio');
+    if (!descripcionValue) missingFields.push('Descripción');
+    if (!institucionValue.trim()) missingFields.push('Institución');
+    if (!fechaInicioValue) missingFields.push('Fecha inicio');
+    if (!fechaFinValue) missingFields.push('Fecha fin');
+    if (!horasLectivasValue) missingFields.push('Horas lectivas');
+    if (isNacional) {
+      if (!rucValue.trim()) missingFields.push('RUC');
+      if (!distritoValue) missingFields.push('Ubigeo');
+    } else if (isInternacional) {
+      if (!paisValue) missingFields.push('País');
+    }
+    if (!hasArchivo) missingFields.push('Documento de evidencia');
+    if (missingFields.length > 0) {
+      setSaveMessage(`Complete los campos obligatorios: ${missingFields.join(', ')}.`);
+      setSaveMessageType('error');
+      return;
+    }
     const tipoEstudioDescripcion =
       tipoEstudioOptions.find((item) => String(item.id) === tipoEstudio)?.descripcion || tipoEstudio;
     const nuevoCurso: Omit<Curso, 'id'> = {
       tipoEstudio: tipoEstudioDescripcion,
-      descripcion: formData.get('descripcion') as string,
+      descripcion: descripcionValue,
       tipoInstitucion,
-      institucion: formData.get('institucion') as string,
-      fechaInicio: formData.get('fechaInicio') as string,
-      fechaFin: formData.get('fechaFin') as string,
-      horasLectivas: formData.get('horasLectivas') as string,
+      institucion: institucionValue,
+      fechaInicio: fechaInicioValue,
+      fechaFin: fechaFinValue,
+      horasLectivas: horasLectivasValue,
       documento: documentoPreview || '',
     };
 
@@ -310,13 +402,12 @@ export function CursoForm({
     }
 
     if (isNacional) {
-      nuevoCurso.ruc = formData.get('ruc') as string;
+      nuevoCurso.ruc = rucValue.trim();
       nuevoCurso.distrito = distritoValue;
     } else {
       nuevoCurso.pais = paisValue;
     }
 
-    const hasArchivo = !documentoEliminado && Boolean(documentoFile || documentoPreview);
     const payload = {
       idHvCurso: Number(curso?.idHvCurso || curso?.id || 0),
       idHojaVida,
@@ -416,7 +507,9 @@ export function CursoForm({
             <>
               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tipoInstitucion">Tipo de institución</Label>
+                  <Label htmlFor="tipoInstitucion">
+                    Tipo de institución <span className="text-red-500">*</span>
+                  </Label>
                   <Select
                     name="tipoInstitucion"
                     value={tipoInstitucion || undefined}
@@ -436,7 +529,9 @@ export function CursoForm({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ruc">RUC</Label>
+                  <Label htmlFor="ruc">
+                    RUC <span className="text-red-500">*</span>
+                  </Label>
                   <div className="flex gap-2">
                     <Input
                       id="ruc"
@@ -444,40 +539,54 @@ export function CursoForm({
                       type="text"
                       placeholder=""
                       maxLength={11}
-                      defaultValue={curso?.ruc || ''}
+                      value={rucValue}
+                      onChange={(e) => setRucValue(e.target.value)}
                     />
-                    <Button type="button" variant="outline" className="gap-2 whitespace-nowrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2 whitespace-nowrap"
+                      onClick={handleBuscarRuc}
+                      disabled={isSearchingRuc}
+                    >
                       <Search className="w-4 h-4" />
-                      Buscar
+                      {isSearchingRuc ? 'Buscando...' : 'Buscar'}
                     </Button>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="institucion">Institución</Label>
+                  <Label htmlFor="institucion">
+                    Institución <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="institucion"
                     name="institucion"
                     type="text"
                     placeholder=""
-                    defaultValue={curso?.institucion || ''}
+                    value={institucionValue}
+                    onChange={(e) => setInstitucionValue(e.target.value)}
                   />
                 </div>
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="distrito">Ubigeo (Departamento / Provincia / Distrito)</Label>
-                <Select
-                  name="distrito"
-                  value={distritoValue}
-                  onValueChange={(value) => {
-                    setDistritoValue(value);
-                    const selected = ubigeoOptions.find((item) => String(item.id) === value);
-                    if (selected) {
-                      setUbigeoQuery(selected.descripcion);
-                    }
-                  }}
-                >
+                <Label htmlFor="distrito">
+                  Ubigeo (Departamento / Provincia / Distrito) <span className="text-red-500">*</span>
+                </Label>
+            <Select
+              name="distrito"
+              value={distritoValue}
+              onValueChange={(value) => {
+                setDistritoValue(value);
+                const selected = ubigeoOptions.find((item) => String(item.id) === value);
+                if (selected) {
+                  setUbigeoQuery(selected.descripcion);
+                } else if (value) {
+                  setUbigeoQuery(value);
+                }
+              }}
+            >
                   <SelectTrigger id="distrito">
                     <SelectValue placeholder="Buscar ubigeo" />
                   </SelectTrigger>
@@ -521,32 +630,42 @@ export function CursoForm({
                         </Button>
                       </div>
                     </div>
-                    {ubigeoQuery.trim().length < 3 ? (
-                      <SelectItem value="min" disabled>
-                        Ingrese al menos 3 caracteres
+                {ubigeoQuery.trim().length < 3 ? (
+                  <SelectItem value="min" disabled>
+                    Ingrese al menos 3 caracteres
+                  </SelectItem>
+                ) : isUbigeoLoading ? (
+                  <SelectItem value="loading" disabled>
+                    Buscando...
+                  </SelectItem>
+                ) : ubigeoOptions.length === 0 ? (
+                  <>
+                    {/^\d{6}$/.test(ubigeoQuery.trim()) ? (
+                      <SelectItem value={ubigeoQuery.trim()}>
+                        Usar codigo {ubigeoQuery.trim()}
                       </SelectItem>
-                    ) : isUbigeoLoading ? (
-                      <SelectItem value="loading" disabled>
-                        Buscando...
-                      </SelectItem>
-                    ) : ubigeoOptions.length === 0 ? (
+                    ) : (
                       <SelectItem value="empty" disabled>
                         Sin resultados
                       </SelectItem>
-                    ) : (
-                      ubigeoOptions.map((item) => (
-                        <SelectItem key={item.id} value={String(item.id)}>
-                          {item.descripcion}
-                        </SelectItem>
-                      ))
                     )}
-                  </SelectContent>
-                </Select>
-              </div>
+                  </>
+                ) : (
+                  ubigeoOptions.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.descripcion}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
             </>
           ) : (
             <div className="space-y-2">
-              <Label htmlFor="tipoInstitucion">Tipo de institución</Label>
+              <Label htmlFor="tipoInstitucion">
+                Tipo de institución <span className="text-red-500">*</span>
+              </Label>
               <Select
                 name="tipoInstitucion"
                 value={tipoInstitucion || undefined}
@@ -569,18 +688,23 @@ export function CursoForm({
           {isInternacional && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="institucion">Nombre de institución</Label>
+                <Label htmlFor="institucion">
+                  Nombre de institución <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="institucion"
                   name="institucion"
                   type="text"
                   placeholder=""
-                  defaultValue={curso?.institucion || ''}
+                  value={institucionValue}
+                  onChange={(e) => setInstitucionValue(e.target.value)}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="pais">País</Label>
+                <Label htmlFor="pais">
+                  País <span className="text-red-500">*</span>
+                </Label>
                 <Select
                   name="pais"
                   value={paisValue || undefined}
@@ -658,7 +782,9 @@ export function CursoForm({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="tipoEstudio">Tipo de estudio</Label>
+            <Label htmlFor="tipoEstudio">
+              Tipo de estudio <span className="text-red-500">*</span>
+            </Label>
             <Select
               name="tipoEstudio"
               value={tipoEstudio || undefined}
@@ -678,7 +804,9 @@ export function CursoForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="descripcion">Descripción</Label>
+            <Label htmlFor="descripcion">
+              Descripción <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="descripcion"
               name="descripcion"
@@ -689,7 +817,9 @@ export function CursoForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="fechaInicio">Fecha inicio (dd/mm/aaaa)</Label>
+            <Label htmlFor="fechaInicio">
+              Fecha inicio (dd/mm/aaaa) <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="fechaInicio"
               name="fechaInicio"
@@ -701,7 +831,9 @@ export function CursoForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="fechaFin">Fecha fin (dd/mm/aaaa)</Label>
+            <Label htmlFor="fechaFin">
+              Fecha fin (dd/mm/aaaa) <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="fechaFin"
               name="fechaFin"
@@ -713,7 +845,9 @@ export function CursoForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="horasLectivas">Horas lectivas</Label>
+            <Label htmlFor="horasLectivas">
+              Horas lectivas <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="horasLectivas"
               name="horasLectivas"
@@ -724,7 +858,9 @@ export function CursoForm({
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="documento-curso">Documento de evidencia</Label>
+            <Label htmlFor="documento-curso">
+              Documento de evidencia <span className="text-red-500">*</span>
+            </Label>
             <div className="space-y-2">
               <label
                 htmlFor="documento-curso"

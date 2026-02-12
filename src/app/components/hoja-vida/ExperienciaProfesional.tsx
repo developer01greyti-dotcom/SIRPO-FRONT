@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { PdfViewer } from '../PdfViewer';
-import { fetchHojaVidaActual, fetchHvExpList } from '../../api/hojaVida';
+import { fetchHojaVidaActual, fetchHojaVidaDatos, fetchHvExpList } from '../../api/hojaVida';
 import type { LoginResponse } from '../../api/auth';
 
 interface Experiencia {
@@ -28,6 +28,7 @@ interface Experiencia {
   tipoEntidad: string;
   tipoEntidadId?: string;
   nombreEntidad: string;
+  ruc?: string;
   distritoId?: string;
   distritoDescripcion?: string;
   area: string;
@@ -38,6 +39,7 @@ interface Experiencia {
   fechaInicio: string;
   fechaFin: string;
   certificadoPreview: string | null;
+  experienciaEspecifica?: boolean;
 }
 
 export function ExperienciaProfesional({ user }: { user: LoginResponse | null }) {
@@ -45,6 +47,7 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hojaVidaId, setHojaVidaId] = useState(0);
+  const [rucPersona, setRucPersona] = useState<string>('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [vistaActual, setVistaActual] = useState<'lista' | 'formulario' | 'pdf-viewer'>('lista');
   const [modoFormulario, setModoFormulario] = useState<'crear' | 'editar'>('crear');
@@ -64,26 +67,42 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     return `${apiBaseUrl}/hv_ref_archivo/file?${params.toString()}`;
   };
 
+  const normalizeEspecifica = (value: any): boolean => {
+    if (value === true || value === 'true' || value === '1') return true;
+    const numeric = Number(value);
+    return !Number.isNaN(numeric) ? numeric > 0 : false;
+  };
+
   const normalizeExperiencias = (items: any[]): Experiencia[] => {
-    return items.map((item, index) => ({
-      id: String(item.id ?? item.idHvExperiencia ?? index),
-      idHvExperiencia: String(item.idHvExperiencia ?? ''),
-      tipoExperiencia: item.tipoExperiencia ?? '',
-      tipoExperienciaId: item.tipoExperienciaId ?? '',
-      tipoEntidad: item.tipoEntidad ?? '',
-      tipoEntidadId: item.tipoEntidadId ?? '',
-      nombreEntidad: item.nombreEntidad ?? '',
-      distritoId: item.distritoId ?? '',
-      distritoDescripcion: item.distritoDescripcion ?? '',
-      area: item.area ?? '',
-      cargo: item.cargo ?? '',
-      funcionesPrincipales: item.funcionesPrincipales ?? '',
-      motivoCese: item.motivoCese ?? '',
-      motivoCeseId: item.motivoCeseId ?? '',
-      fechaInicio: item.fechaInicio ?? '',
-      fechaFin: item.fechaFin ?? '',
-      certificadoPreview: item.archivoGuid ? buildFileUrl(String(item.archivoGuid)) : null,
-    }));
+    return items.map((item, index) => {
+      const especificaRaw =
+        item.experienciaEspecifica ??
+        item.experiencia_especifica ??
+        item.especifica ??
+        false;
+      const experienciaEspecifica = normalizeEspecifica(especificaRaw);
+      return {
+        id: String(item.id ?? item.idHvExperiencia ?? index),
+        idHvExperiencia: String(item.idHvExperiencia ?? ''),
+        tipoExperiencia: item.tipoExperiencia ?? '',
+        tipoExperienciaId: item.tipoExperienciaId ?? '',
+        tipoEntidad: item.tipoEntidad ?? '',
+        tipoEntidadId: item.tipoEntidadId ?? '',
+        nombreEntidad: item.nombreEntidad ?? '',
+        ruc: item.ruc ?? '',
+        distritoId: item.distritoId ?? '',
+        distritoDescripcion: item.distritoDescripcion ?? '',
+        area: item.area ?? '',
+        cargo: item.cargo ?? '',
+        funcionesPrincipales: item.funcionesPrincipales ?? '',
+        motivoCese: item.motivoCese ?? '',
+        motivoCeseId: item.motivoCeseId ?? '',
+        fechaInicio: item.fechaInicio ?? '',
+        fechaFin: item.fechaFin ?? '',
+        certificadoPreview: item.archivoGuid ? buildFileUrl(String(item.archivoGuid)) : null,
+        experienciaEspecifica,
+      };
+    });
   };
 
   const parseFecha = (value: string): Date | null => {
@@ -185,10 +204,14 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
           return;
         }
         setHojaVidaId(idHojaVida);
-        const expData = await fetchHvExpList(idHojaVida);
+        const [expData, datosHv] = await Promise.all([
+          fetchHvExpList(idHojaVida),
+          fetchHojaVidaDatos(idHojaVida),
+        ]);
         if (!isActive) {
           return;
         }
+        setRucPersona(String(datosHv?.ruc ?? user?.ruc ?? '').trim());
         const items = Array.isArray(expData) ? expData : expData ? [expData] : [];
         setExperiencias(normalizeExperiencias(items));
       } catch (error) {
@@ -215,9 +238,9 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     return date.toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const totalExperiencia = (() => {
+  const calcularTotalExperiencia = (items: Experiencia[]) => {
     let totalDays = 0;
-    experiencias.forEach((exp) => {
+    items.forEach((exp) => {
       const start = parseFecha(exp.fechaInicio);
       if (!start) return;
       const motivo = (exp.motivoCese || '').toLowerCase();
@@ -233,7 +256,12 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     const months = Math.floor((totalDays % 365) / 30);
     const days = totalDays % 30;
     return { years, months, days, totalDays };
-  })();
+  };
+
+  const experienciasEspecificas = experiencias.filter((exp) => exp.experienciaEspecifica);
+  const experienciasGenerales = experiencias.filter((exp) => !exp.experienciaEspecifica);
+  const totalExperienciaGeneral = calcularTotalExperiencia(experienciasGenerales);
+  const totalExperienciaEspecifica = calcularTotalExperiencia(experienciasEspecificas);
 
   const getTipoExperienciaLabel = (tipo: string) => {
     const labels: Record<string, string> = {
@@ -262,6 +290,97 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     return labels[motivo] || motivo;
   };
 
+  const renderExperienciasTable = (items: Experiencia[], emptyText: string) => {
+    if (items.length === 0) {
+      return (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
+          <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-sm text-gray-600">{emptyText}</p>
+        </div>
+      );
+    }
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">#</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Cargo</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Entidad</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Tipo Experiencia</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Tipo Entidad</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Periodo</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Motivo de Cese</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Certificado</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {items.map((experiencia, index) => (
+              <tr key={`${experiencia.id}-${index}`} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{experiencia.cargo || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{experiencia.nombreEntidad || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  {getTipoExperienciaLabel(experiencia.tipoExperiencia)}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  {getTipoEntidadLabel(experiencia.tipoEntidad)}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  {experiencia.motivoCese === 'actualidad'
+                    ? `${formatFecha(experiencia.fechaInicio)} - Actualidad`
+                    : `${formatFecha(experiencia.fechaInicio)} - ${formatFecha(experiencia.fechaFin)}`}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  {getMotivoCeseLabel(experiencia.motivoCese)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                  {experiencia.certificadoPreview ? (
+                    <span className="text-green-600 font-medium">Con archivo</span>
+                  ) : (
+                    'Sin archivo'
+                  )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEditarExperiencia(experiencia)}>
+                        <Edit2 className="w-4 h-4 mr-2" />
+                        Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEliminarExperiencia(experiencia.id)} className="text-red-600">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Eliminar
+                      </DropdownMenuItem>
+                      {experiencia.certificadoPreview && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setVistaActual('pdf-viewer');
+                            setPdfUrl(experiencia.certificadoPreview || '');
+                            setPdfTitle(`Certificado - ${experiencia.cargo}`);
+                          }}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Ver
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <>
       {vistaActual === 'lista' ? (
@@ -277,11 +396,6 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
                 </p>
               </div>
               <div className="flex items-start gap-4">
-                {totalExperiencia.totalDays > 0 && (
-                  <p className="text-sm text-gray-700 whitespace-nowrap mt-1">
-                    Total de experiencia: {totalExperiencia.years} años, {totalExperiencia.months} meses, {totalExperiencia.days} días
-                  </p>
-                )}
                 <Button
                   type="button"
                   onClick={handleAgregarExperiencia}
@@ -302,90 +416,31 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
               <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed text-red-600">
                 {loadError}
               </div>
-            ) : experiencias.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">#</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Cargo</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Entidad</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Tipo Experiencia</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Tipo Entidad</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Periodo</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Motivo de Cese</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Certificado</th>
-                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {experiencias.map((experiencia, index) => (
-                      <tr key={experiencia.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                        <td className="px-6 py-4 text-sm text-gray-900">{experiencia.cargo || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-900">{experiencia.nombreEntidad || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {getTipoExperienciaLabel(experiencia.tipoExperiencia)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {getTipoEntidadLabel(experiencia.tipoEntidad)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {experiencia.motivoCese === 'actualidad'
-                            ? `${formatFecha(experiencia.fechaInicio)} - Actualidad`
-                            : `${formatFecha(experiencia.fechaInicio)} - ${formatFecha(experiencia.fechaFin)}`}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {getMotivoCeseLabel(experiencia.motivoCese)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                          {experiencia.certificadoPreview ? (
-                            <span className="text-green-600 font-medium">Con archivo</span>
-                          ) : (
-                            'Sin archivo'
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditarExperiencia(experiencia)}>
-                                <Edit2 className="w-4 h-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEliminarExperiencia(experiencia.id)} className="text-red-600">
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                              {experiencia.certificadoPreview && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setVistaActual('pdf-viewer');
-                                    setPdfUrl(experiencia.certificadoPreview || '');
-                                    setPdfTitle(`Certificado - ${experiencia.cargo}`);
-                                  }}
-                                >
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  Ver
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-                <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-sm text-gray-600">No hay experiencias profesionales registradas</p>
-                <p className="text-xs text-gray-500 mt-1">Haz clic en "Agregar" para comenzar</p>
+              <div className="space-y-8">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-base font-semibold text-gray-900">Experiencia General</h4>
+                    {totalExperienciaGeneral.totalDays > 0 && (
+                      <p className="text-sm text-gray-700 whitespace-nowrap">
+                        Total: {totalExperienciaGeneral.years} años, {totalExperienciaGeneral.months} meses, {totalExperienciaGeneral.days} días
+                      </p>
+                    )}
+                  </div>
+                  {renderExperienciasTable(experienciasGenerales, 'No hay experiencias profesionales registradas')}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-base font-semibold text-gray-900">Experiencia Específica</h4>
+                    {totalExperienciaEspecifica.totalDays > 0 && (
+                      <p className="text-sm text-gray-700 whitespace-nowrap">
+                        Total: {totalExperienciaEspecifica.years} años, {totalExperienciaEspecifica.months} meses, {totalExperienciaEspecifica.days} días
+                      </p>
+                    )}
+                  </div>
+                  {renderExperienciasTable(experienciasEspecificas, 'No hay experiencias específicas registradas')}
+                </div>
               </div>
             )}
           </div>
@@ -397,6 +452,7 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
           onGuardar={handleSaveExperiencia}
           idHojaVida={hojaVidaId}
           usuarioAccion={user?.idUsuario || 0}
+          rucPersona={rucPersona || user?.ruc}
           onCancelar={() => {
             setVistaActual('lista');
             setExperienciaToEdit(null);
