@@ -41,6 +41,17 @@ const isAuthEndpoint = (url?: string) => {
   );
 };
 
+const isPublicRoute = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname || '';
+  return (
+    path.endsWith('/login') ||
+    path.endsWith('/registroUsuario') ||
+    path.endsWith('/recuperarContrasena') ||
+    path.endsWith('/admin/login')
+  );
+};
+
 const getBasePath = () => {
   const base = (import.meta as { env?: { BASE_URL?: string } })?.env?.BASE_URL || '/';
   if (!base.endsWith('/')) return `${base}/`;
@@ -100,7 +111,7 @@ apiClient.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url as string | undefined;
-    if (status === 401 && !isAuthEndpoint(url)) {
+    if (status === 401 && !isAuthEndpoint(url) && !isPublicRoute()) {
       markSessionExpired();
       toast.error('Tu sesión expiró. Inicia sesión nuevamente.');
       clearStoredAuth();

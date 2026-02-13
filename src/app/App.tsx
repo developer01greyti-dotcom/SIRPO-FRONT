@@ -646,9 +646,9 @@ export default function App() {
   const isAdminSectionAllowed = (section: string, role?: AdminRole | null) => {
     if (!role) return true;
     if (section === 'registros') return true;
-    if (section === 'servicios') return role !== 'uaba';
-    if (section === 'plantillas') return role === 'gestor' || role === 'superadmin';
-    if (section === 'usuarios') return role === 'superadmin';
+    if (section === 'servicios') return role === 'superadmin' || role === 'date';
+    if (section === 'plantillas') return role === 'superadmin' || role === 'date';
+    if (section === 'usuarios') return role === 'superadmin' || role === 'date';
     return false;
   };
 
@@ -1078,7 +1078,9 @@ export default function App() {
             />
           )}
           {adminSection === 'plantillas' && <PlantillasCorreo />}
-          {adminSection === 'usuarios' && <GestionUsuariosAdmin adminUserId={adminUserId} />}
+          {adminSection === 'usuarios' && (
+            <GestionUsuariosAdmin adminUserId={adminUserId} adminRole={adminRole} />
+          )}
         </main>
         </div>
       </>

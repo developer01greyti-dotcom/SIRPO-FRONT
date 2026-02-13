@@ -80,6 +80,7 @@ export const loginAdmin = async (
             password,
           },
         },
+        { timeout: 7000 },
       );
       const data = response.data;
       const normalized = Array.isArray(data) ? data[0] : data;

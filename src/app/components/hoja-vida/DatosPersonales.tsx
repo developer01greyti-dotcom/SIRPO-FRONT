@@ -1291,6 +1291,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 value={formData.numeroDocumento}
 
                 onChange={(e) => updateField('numeroDocumento', e.target.value)}
+                readOnly
 
                 required
 

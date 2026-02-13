@@ -37,16 +37,16 @@ export const getRoleLabel = (role?: AdminRole | null) => {
 };
 
 export const canManageServicios = (role?: AdminRole | null) =>
-  role === 'gestor' || role === 'superadmin' || role === 'date';
+  role === 'superadmin' || role === 'date';
 
 export const canCreateServicios = (role?: AdminRole | null) =>
-  role === 'gestor' || role === 'superadmin';
+  role === 'superadmin' || role === 'date';
 
 export const canDeleteServicios = (role?: AdminRole | null) =>
-  role === 'gestor' || role === 'superadmin';
+  role === 'superadmin' || role === 'date';
 
 export const canEvaluatePostulaciones = (role?: AdminRole | null) =>
-  role === 'gestor' || role === 'superadmin';
+  role === 'superadmin' || role === 'date';
 
 export const isCumpleOnlyRole = (role?: AdminRole | null) =>
   role === 'date' || role === 'uaba';

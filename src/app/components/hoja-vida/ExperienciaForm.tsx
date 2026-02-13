@@ -58,13 +58,20 @@ export function ExperienciaForm({
   onGuardar,
   onCancelar,
 }: ExperienciaFormProps) {
+  const parseEspecifica = (value: any) => {
+    if (value === 0 || value === '0') return true;
+    if (value === 1 || value === '1') return false;
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return false;
+  };
   const [tipoExperiencia, setTipoExperiencia] = useState<string>(experiencia?.tipoExperienciaId || '');
   const [tipoEntidad, setTipoEntidad] = useState<string>(experiencia?.tipoEntidadId || '');
   const [motivoCese, setMotivoCese] = useState(experiencia?.motivoCeseId || '');
   const [nombreEntidadValue, setNombreEntidadValue] = useState<string>(experiencia?.nombreEntidad || '');
   const [rucValue, setRucValue] = useState<string>(rucPersona || experiencia?.ruc || '');
   const [experienciaEspecifica, setExperienciaEspecifica] = useState<boolean>(
-    Boolean(experiencia?.experienciaEspecifica),
+    parseEspecifica(experiencia?.experienciaEspecifica),
   );
   const [isSearchingRuc, setIsSearchingRuc] = useState(false);
   const [fechaInicioValue, setFechaInicioValue] = useState(experiencia?.fechaInicio || '');
@@ -241,7 +248,7 @@ export function ExperienciaForm({
     );
     setNombreEntidadValue(experiencia?.nombreEntidad || '');
     setRucValue(rucPersona || experiencia?.ruc || '');
-    setExperienciaEspecifica(Boolean(experiencia?.experienciaEspecifica));
+    setExperienciaEspecifica(parseEspecifica(experiencia?.experienciaEspecifica));
     const distritoId = String(experiencia?.distritoId || '');
     const distritoDesc = experiencia?.distritoDescripcion || '';
     setDistritoValue('');
@@ -321,11 +328,13 @@ export function ExperienciaForm({
     if (!rucPersona) return;
     const normalized = rucPersona.trim();
     if (!normalized) return;
-    setRucValue(normalized);
-    if (!nombreEntidadValue) {
-      buscarRuc(normalized);
+    if (!rucValue) {
+      setRucValue(normalized);
+      if (!nombreEntidadValue) {
+        buscarRuc(normalized);
+      }
     }
-  }, [rucPersona, nombreEntidadValue]);
+  }, [rucPersona]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,7 +423,7 @@ export function ExperienciaForm({
       fechaInicio: nuevaExperiencia.fechaInicio,
       fechaFin: nuevaExperiencia.fechaFin,
       idArchivo: hasArchivo ? 1 : 0,
-      experienciaEspecifica: experienciaEspecifica ? 1 : 0,
+      experienciaEspecifica: experienciaEspecifica ? 0 : 1,
       usuarioAccion,
     };
 
@@ -554,7 +563,6 @@ export function ExperienciaForm({
                 maxLength={11}
                 value={rucValue}
                 onChange={(e) => setRucValue(e.target.value)}
-                readOnly={Boolean(rucPersona)}
               />
               <Button
                 type="button"

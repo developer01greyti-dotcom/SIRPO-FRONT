@@ -57,8 +57,12 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
         result.idOficinaZonal,
         result.oficinaZonal,
       );
-    } catch (err) {
-      setError('No se pudo iniciar sesión. Inténtalo nuevamente.');
+    } catch (err: any) {
+      if (err?.code === 'ECONNABORTED') {
+        setError('El servidor tardó en responder. Inténtalo nuevamente.');
+      } else {
+        setError('No se pudo iniciar sesión. Inténtalo nuevamente.');
+      }
     } finally {
       setIsSubmitting(false);
     }

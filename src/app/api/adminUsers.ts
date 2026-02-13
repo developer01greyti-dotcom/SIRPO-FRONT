@@ -26,6 +26,7 @@ export interface AdminUserUpsertPayload {
   email: string;
   idAdminRol: number;
   estado: string;
+  estadoNuevo: number;
   usuarioAccion: number;
 }
 
@@ -64,6 +65,7 @@ export const upsertAdminUser = async (
       email: payload.email,
       idAdminRol: payload.idAdminRol,
       estado: payload.estado,
+      estadoNuevo: payload.estadoNuevo,
       usuarioAccion: payload.usuarioAccion,
     },
   });

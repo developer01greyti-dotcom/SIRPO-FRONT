@@ -21,9 +21,9 @@ export function AdminSidebar({
 
   const menuItems = [
     { id: 'registros', icon: Users, label: 'Registros', roles: ['gestor', 'superadmin', 'date', 'uaba'] },
-    { id: 'servicios', icon: Briefcase, label: 'Servicios', roles: ['gestor', 'superadmin', 'date', 'uaba'] },
-    { id: 'plantillas', icon: Mail, label: 'Plantillas de Correo', roles: ['gestor', 'superadmin'] },
-    { id: 'usuarios', icon: Shield, label: 'Gestión de Usuarios', roles: ['superadmin'] },
+    { id: 'servicios', icon: Briefcase, label: 'Servicios', roles: ['superadmin', 'date'] },
+    { id: 'plantillas', icon: Mail, label: 'Plantillas de Correo', roles: ['superadmin', 'date'] },
+    { id: 'usuarios', icon: Shield, label: 'Gestión de Usuarios', roles: ['superadmin', 'date'] },
   ];
 
   const filteredMenuItems = menuItems.filter((item) => !userRole || item.roles.includes(userRole));

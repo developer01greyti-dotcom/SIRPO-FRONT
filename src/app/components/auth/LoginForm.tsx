@@ -151,6 +151,7 @@ export function LoginForm({ onLogin, onNavigateToRegister, onNavigateToRecovery 
             <p className="text-sm text-gray-600">
               ¿No tienes una cuenta?{' '}
               <button
+                type="button"
                 onClick={onNavigateToRegister}
                 className="text-sm text-green-600 hover:text-green-700 font-medium"
               >

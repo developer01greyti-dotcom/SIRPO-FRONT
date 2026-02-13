@@ -68,9 +68,12 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
   };
 
   const normalizeEspecifica = (value: any): boolean => {
-    if (value === true || value === 'true' || value === '1') return true;
-    const numeric = Number(value);
-    return !Number.isNaN(numeric) ? numeric > 0 : false;
+    if (value === null || value === undefined || value === '') return false;
+    if (value === 0 || value === '0') return true;
+    if (value === 1 || value === '1') return false;
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return false;
   };
 
   const normalizeExperiencias = (items: any[]): Experiencia[] => {
@@ -262,6 +265,7 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
   const experienciasGenerales = experiencias.filter((exp) => !exp.experienciaEspecifica);
   const totalExperienciaGeneral = calcularTotalExperiencia(experienciasGenerales);
   const totalExperienciaEspecifica = calcularTotalExperiencia(experienciasEspecificas);
+  const totalExperienciaTotal = calcularTotalExperiencia(experiencias);
 
   const getTipoExperienciaLabel = (tipo: string) => {
     const labels: Record<string, string> = {
@@ -418,6 +422,18 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
               </div>
             ) : (
               <div className="space-y-8">
+                <div className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                  <span className="font-semibold text-gray-900">Totales:</span>
+                  <span>
+                    General: {totalExperienciaGeneral.years} años, {totalExperienciaGeneral.months} meses, {totalExperienciaGeneral.days} días
+                  </span>
+                  <span>
+                    Específica: {totalExperienciaEspecifica.years} años, {totalExperienciaEspecifica.months} meses, {totalExperienciaEspecifica.days} días
+                  </span>
+                  <span className="font-semibold text-gray-900">
+                    Total: {totalExperienciaTotal.years} años, {totalExperienciaTotal.months} meses, {totalExperienciaTotal.days} días
+                  </span>
+                </div>
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-base font-semibold text-gray-900">Experiencia General</h4>

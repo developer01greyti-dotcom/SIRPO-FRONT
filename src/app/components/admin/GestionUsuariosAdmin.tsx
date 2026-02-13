@@ -15,13 +15,15 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { fetchAdminUsers, updateAdminUserStatus, upsertAdminUser } from '../../api/adminUsers';
+import type { AdminRole } from '../../utils/roles';
 import { fetchRolDropdown, type DropdownItem } from '../../api/catalogos';
 
 const ROLE_OPTIONS: DropdownItem[] = [
-  { id: 0, descripcion: 'Usuario (sin acceso admin)' },
-  { id: 1, descripcion: 'Admin (total acceso)' },
-  { id: 2, descripcion: 'DATE' },
-  { id: 3, descripcion: 'UABA' },
+  { id: 1, descripcion: 'Gestor de Convocatorias' },
+  { id: 2, descripcion: 'Super Administrador' },
+  { id: 21, descripcion: 'DATE' },
+  { id: 22, descripcion: 'UABA' },
+  { id: 23, descripcion: 'Jefe Zonal / Coordinador' },
 ];
 
 interface UsuarioAdmin {
@@ -38,9 +40,10 @@ interface UsuarioAdmin {
 
 interface GestionUsuariosAdminProps {
   adminUserId?: number;
+  adminRole?: AdminRole | null;
 }
 
-export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminProps) {
+export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsuariosAdminProps) {
   const [usuarios, setUsuarios] = useState<UsuarioAdmin[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -76,6 +79,29 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
     }
   }, []);
 
+  const normalizeRoleLabel = (label: string) =>
+    (label || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  const filterRoleOptions = useCallback(
+    (options: DropdownItem[]) => {
+      const base = options.filter((rol) => {
+        const label = normalizeRoleLabel(rol.descripcion);
+        return !label.includes('sin acceso');
+      });
+      if (adminRole === 'date') {
+        return base.filter((rol) => {
+          const label = normalizeRoleLabel(rol.descripcion);
+          return label.includes('jefe') || label.includes('coordinador');
+        });
+      }
+      return base;
+    },
+    [adminRole],
+  );
+
   useEffect(() => {
     let isActive = true;
 
@@ -86,14 +112,12 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
         const [users, roles] = await Promise.all([fetchAdminUsers(), fetchRolDropdown()]);
         if (!isActive) return;
         setUsuarios(users);
-        const normalizedRoles = roles?.length ? roles : ROLE_OPTIONS;
-        const roleIds = new Set(normalizedRoles.map((item) => String(item.id)));
-        const hasExpected = ROLE_OPTIONS.every((item) => roleIds.has(String(item.id)));
-        setRolOptions(hasExpected ? normalizedRoles : ROLE_OPTIONS);
+        const sourceRoles = roles && roles.length > 0 ? roles : ROLE_OPTIONS;
+        setRolOptions(filterRoleOptions(sourceRoles));
       } catch (error) {
         if (!isActive) return;
         setUsuarios([]);
-        setRolOptions(ROLE_OPTIONS);
+        setRolOptions(filterRoleOptions(ROLE_OPTIONS));
         setLoadError('No se pudo cargar el listado de usuarios.');
       } finally {
         if (isActive) {
@@ -107,21 +131,24 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [filterRoleOptions]);
 
   const getNormalizedRole = (rol: string, rolId?: string | number) => {
     const rolText = (rol || '').toLowerCase();
-    if (rolId === 1 || rolId === '1' || rolText.includes('admin') || rolText.includes('super')) {
+    if (rolId === 2 || rolId === '2' || rolText.includes('admin') || rolText.includes('super')) {
       return 'admin';
     }
-    if (rolId === 2 || rolId === '2' || rolText.includes('date')) {
+    if (rolId === 1 || rolId === '1' || rolText.includes('gestor')) {
+      return 'gestor';
+    }
+    if (rolId === 21 || rolId === '21' || rolText.includes('date')) {
       return 'date';
     }
-    if (rolId === 3 || rolId === '3' || rolText.includes('uaba')) {
+    if (rolId === 22 || rolId === '22' || rolText.includes('uaba')) {
       return 'uaba';
     }
-    if (rolId === 0 || rolId === '0' || rolText.includes('usuario')) {
-      return 'usuario';
+    if (rolId === 23 || rolId === '23' || rolText.includes('jefe') || rolText.includes('coordinador')) {
+      return 'jefe';
     }
     return 'usuario';
   };
@@ -155,6 +182,10 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
   };
 
   const handleEditarUsuario = (usuario: UsuarioAdmin) => {
+    if (adminRole === 'date' && getNormalizedRole(usuario.rol, usuario.rolId) !== 'jefe') {
+      alert('DATE solo puede modificar usuarios Jefe Zonal / Coordinador.');
+      return;
+    }
     setIsEditing(true);
     setSelectedUsuario(usuario);
     setFormData({
@@ -172,6 +203,13 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
       alert('Por favor complete todos los campos obligatorios');
       return;
     }
+    if (adminRole === 'date') {
+      const selectedRole = getNormalizedRole(selectedRoleName, formData.rolId);
+      if (selectedRole !== 'jefe') {
+        alert('DATE solo puede crear o modificar usuarios Jefe Zonal / Coordinador.');
+        return;
+      }
+    }
 
     setIsSaving(true);
     try {
@@ -182,6 +220,7 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
         email: formData.email,
         idAdminRol: Number(formData.rolId),
         estado: formData.estado,
+        estadoNuevo: getEstadoNuevoFromRolId(formData.rolId),
         usuarioAccion: adminUserId,
       });
 
@@ -213,6 +252,10 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
   };
 
   const handleCambiarEstado = (usuario: UsuarioAdmin) => {
+    if (adminRole === 'date' && getNormalizedRole(usuario.rol, usuario.rolId) !== 'jefe') {
+      alert('DATE solo puede cambiar estado de usuarios Jefe Zonal / Coordinador.');
+      return;
+    }
     setConfirmState({ open: true, usuario });
   };
 
@@ -243,11 +286,17 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
     if (normalized === 'admin') {
       return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Admin</Badge>;
     }
+    if (normalized === 'gestor') {
+      return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Gestor</Badge>;
+    }
     if (normalized === 'date') {
       return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">DATE</Badge>;
     }
     if (normalized === 'uaba') {
       return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">UABA</Badge>;
+    }
+    if (normalized === 'jefe') {
+      return <Badge className="bg-sky-100 text-sky-700 hover:bg-sky-100">Jefe Zonal</Badge>;
     }
     return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">Usuario</Badge>;
   };
@@ -261,6 +310,16 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
 
   const selectedRoleName =
     rolOptions.find((item) => String(item.id) === String(formData.rolId))?.descripcion || '';
+
+  const getEstadoNuevoFromRolId = (rolId: string | number) => {
+    const match = rolOptions.find((item) => String(item.id) === String(rolId));
+    const label = normalizeRoleLabel(match?.descripcion ?? '');
+    if (label.includes('admin') || label.includes('super')) return 1;
+    if (label.includes('date')) return 2;
+    if (label.includes('uaba')) return 3;
+    if (label.includes('jefe') || label.includes('coordinador')) return 4;
+    return 1;
+  };
 
   // Vista de Formulario (Crear/Editar)
   if (showForm) {
@@ -363,6 +422,8 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
                       <li>Plantillas de Correo</li>
                       <li>Gestión de Usuarios Administrativos</li>
                     </>
+                  ) : getNormalizedRole(selectedRoleName, formData.rolId) === 'gestor' ? (
+                    <li>Gestión de Registros</li>
                   ) : getNormalizedRole(selectedRoleName, formData.rolId) === 'date' ? (
                     <>
                       <li>Gestión de Registros</li>
@@ -370,12 +431,18 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
                     </>
                   ) : getNormalizedRole(selectedRoleName, formData.rolId) === 'uaba' ? (
                     <li>Gestión de Registros</li>
+                  ) : getNormalizedRole(selectedRoleName, formData.rolId) === 'jefe' ? (
+                    <>
+                      <li>Gestión de Registros</li>
+                      <li>Gestión de Servicios</li>
+                    </>
                   ) : (
                     <li>Sin acceso al panel administrativo</li>
                   )}
                 </ul>
               </div>
             </div>
+
           </div>
 
           <div className="flex items-center gap-3 mt-8 pt-6 border-t">
@@ -478,8 +545,11 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
                     </TableCell>
                   </TableRow>
                 ) : (
-                  usuarios.map((usuario) => (
-                    <TableRow key={usuario.id} className="hover:bg-gray-50">
+                  usuarios.map((usuario) => {
+                    const normalizedRole = getNormalizedRole(usuario.rol, usuario.rolId);
+                    const canManageUsuario = adminRole !== 'date' || normalizedRole === 'jefe';
+                    return (
+                      <TableRow key={usuario.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">{usuario.usuarioAD}</TableCell>
                       <TableCell>{usuario.nombreCompleto}</TableCell>
                       <TableCell className="text-sm text-gray-600">{usuario.email}</TableCell>
@@ -493,6 +563,7 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
                             size="sm"
                             onClick={() => handleEditarUsuario(usuario)}
                             className="gap-2"
+                            disabled={!canManageUsuario}
                           >
                             <Edit className="w-4 h-4" />
                             Editar
@@ -506,14 +577,16 @@ export function GestionUsuariosAdmin({ adminUserId = 0 }: GestionUsuariosAdminPr
                                 ? 'gap-2 border-red-300 text-red-700 hover:bg-red-50'
                                 : 'gap-2 bg-green-600 hover:bg-green-700'
                             }
+                            disabled={!canManageUsuario}
                           >
                             <Power className="w-4 h-4" />
                             {isActiveUser(usuario.estado) ? 'Desactivar' : 'Activar'}
                           </Button>
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

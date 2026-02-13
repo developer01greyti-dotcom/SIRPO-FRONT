@@ -530,9 +530,11 @@ export function VistaPrevia({
   };
 
   const toBool = (value: any) => {
-    if (value === true || value === 'true' || value === '1') return true;
-    const numeric = Number(value);
-    return !Number.isNaN(numeric) ? numeric > 0 : false;
+    if (value === 0 || value === '0') return true;
+    if (value === 1 || value === '1') return false;
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return false;
   };
 
   const formaciones = formacionesProp ?? formacionesState;
