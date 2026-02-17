@@ -847,8 +847,12 @@ export default function App() {
       setActiveSection('convocatorias'); 
       setSelectedConvocatoria(null); 
       navigate('/servicios'); 
-    } catch { 
-      alert('No se pudo completar el registro.'); 
+    } catch (error: any) { 
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        'No se pudo completar el registro.';
+      alert(message); 
     } 
   }; 
 
