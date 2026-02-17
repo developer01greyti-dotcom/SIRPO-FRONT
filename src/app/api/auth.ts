@@ -8,6 +8,7 @@ export interface RegisterPayload {
   nombres: string;
   email: string;
   password: string;
+  ruc?: string;
 }
 
 export interface RegisterResponse {
@@ -20,6 +21,9 @@ export interface RegisterResponse {
   tipoDocumento?: string;
   numeroDocumento?: string;
   ruc?: string;
+  nacionalidad?: string;
+  sexo?: string;
+  estadoCivil?: string;
   tipoUsuario?: number | string;
   token?: string;
 }
@@ -83,6 +87,9 @@ export interface LoginResponse {
   tipoDocumento?: string;
   numeroDocumento?: string;
   ruc?: string;
+  nacionalidad?: string;
+  sexo?: string;
+  estadoCivil?: string;
   tipoUsuario?: number | string;
   token?: string;
 }

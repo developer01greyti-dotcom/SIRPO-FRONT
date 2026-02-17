@@ -1,4 +1,4 @@
-import { X, Calendar, MapPin, Briefcase, Building2, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { X, Calendar, MapPin, Briefcase, Building2, Clock } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
@@ -71,13 +71,17 @@ export function DetallePostulacion({
 }: DetallePostulacionProps) {
   const normalizeEstado = (estado: string) => {
     const normalized = (estado || '').toLowerCase().trim();
-    if (normalized === '1') return 'cumple';
-    if (normalized === '2') return 'no cumple';
+    if (normalized === '1') return 'en revision';
+    if (normalized === '2') return 'en revision';
     if (normalized === '0') return 'registrado';
     const compact = normalized.replace(/[-\s]/g, '');
-    if (compact.includes('nocumple')) return 'no cumple';
-    if (compact.includes('cumple')) return 'cumple';
-    if (compact.includes('registr') || compact.includes('revision')) return 'registrado';
+    if (compact.includes('nocumple')) return 'en revision';
+    if (compact.includes('cumple')) return 'en revision';
+    if (compact.includes('preseleccion') || compact.includes('final') || compact.includes('rechaz')) {
+      return 'en revision';
+    }
+    if (compact.includes('registr')) return 'registrado';
+    if (compact.includes('revision')) return 'en revision';
     return normalized;
   };
 
@@ -91,39 +95,11 @@ export function DetallePostulacion({
             Registrado
           </Badge>
         );
-      case 'cumple':
+      case 'en revision':
         return (
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 gap-1">
-            <CheckCircle className="w-3 h-3" />
-            Cumple
-          </Badge>
-        );
-      case 'no cumple':
-        return (
-          <Badge variant="secondary" className="bg-gray-100 text-gray-700 gap-1">
-            <XCircle className="w-3 h-3" />
-            No cumple
-          </Badge>
-        );
-      case 'preseleccionado':
-        return (
-          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 gap-1">
-            <CheckCircle className="w-3 h-3" />
-            Preseleccionado
-          </Badge>
-        );
-      case 'finalista':
-        return (
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 gap-1">
-            <CheckCircle className="w-3 h-3" />
-            Finalista
-          </Badge>
-        );
-      case 'rechazado':
-        return (
-          <Badge variant="secondary" className="bg-gray-100 text-gray-700 gap-1">
-            <XCircle className="w-3 h-3" />
-            No Seleccionado
+          <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 gap-1">
+            <Clock className="w-3 h-3" />
+            En revisión
           </Badge>
         );
       default:

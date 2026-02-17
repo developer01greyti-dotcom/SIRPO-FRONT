@@ -1,21 +1,21 @@
-import { apiClient } from './client';
+import { publicApiClient } from './client';
 
 export const pedirDNI = async (dniConsulta: string): Promise<any> => {
-  const response = await apiClient.post<any>('/pide/reniec/consultar-dni', {
+  const response = await publicApiClient.post<any>('/pide/reniec/consultar-dni', {
     dniConsulta,
   });
   return response.data;
 };
 
 export const pedirRUC = async (rucConsulta: string): Promise<any> => {
-  const response = await apiClient.post<any>('/pide/sunat/consultar-ruc', {
+  const response = await publicApiClient.post<any>('/pide/sunat/consultar-ruc', {
     rucConsulta,
   });
   return response.data;
 };
 
 export const pedirSUNEDU = async (docConsulta: string): Promise<any> => {
-  const response = await apiClient.post<any>('/pide/sunedu/consultar-rngt', {
+  const response = await publicApiClient.post<any>('/pide/sunedu/consultar-rngt', {
     docConsulta,
   });
   return response.data;
@@ -30,16 +30,16 @@ export const pedirAntecedentes = async (payload: {
   nombre3?: string;
   usuario?: string;
 }): Promise<any> => {
-  const response = await apiClient.post<any>('/pide/pj/antecedentes', payload);
+  const response = await publicApiClient.post<any>('/pide/pj/antecedentes', payload);
   return response.data;
 };
 
 export const pedirMigraciones = async (cee: string): Promise<any> => {
-  const response = await apiClient.get<any>(`/pide/migraciones/cee/${cee}`);
+  const response = await publicApiClient.get<any>(`/pide/migraciones/cee/${cee}`);
   return response.data;
 };
 
 export const pedirPNP = async (dni: string): Promise<any> => {
-  const response = await apiClient.get<any>(`/pide/pnp/persona/${dni}`);
+  const response = await publicApiClient.get<any>(`/pide/pnp/persona/${dni}`);
   return response.data;
 };

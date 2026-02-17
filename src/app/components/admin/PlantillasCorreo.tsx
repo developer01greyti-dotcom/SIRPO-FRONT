@@ -1,14 +1,33 @@
-﻿import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Mail, Save, Eye, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
+import {
+  fetchPlantillasCorreo,
+  upsertPlantillaCorreo,
+  type PlantillaCorreoItem,
+} from '../../api/plantillasCorreo';
 
-export function PlantillasCorreo() {
-  const [plantillas, setPlantillas] = useState({
-    bienvenida: {
-      asunto: 'Bienvenido a SIRPO - DEVIDA',
-      contenido: `Estimado/a {{nombre}},
+type PlantillaKey = 'bienvenida' | 'confirmacionPostulacion' | 'cambioEstado' | 'resultadoFinal';
+
+type PlantillaState = {
+  idPlantilla?: number;
+  codigo: string;
+  nombre: string;
+  asunto: string;
+  contenido: string;
+  activo: number;
+  version: number;
+};
+
+const DEFAULT_PLANTILLAS: Record<PlantillaKey, PlantillaState> = {
+  bienvenida: {
+    codigo: 'BIENVENIDA',
+    nombre: 'Bienvenida',
+    asunto: 'Bienvenido a SIRPO - DEVIDA',
+    contenido: `Estimado/a {{nombre}},
 
 Bienvenido al Sistema de Registro de Profesionales y/o Técnicos para Trabajo de Campo en el Marco del PP PIRDAIS (SIRPO) de DEVIDA.
 
@@ -21,10 +40,14 @@ Para comenzar, ingresa al sistema con las credenciales que registraste.
 
 Atentamente,
 Equipo DEVIDA`,
-    },
-    confirmacionPostulacion: {
-      asunto: 'Confirmación de Registro - {{convocatoria}}',
-      contenido: `Estimado/a {{nombre}},
+    activo: 1,
+    version: 1,
+  },
+  confirmacionPostulacion: {
+    codigo: 'CONFIRMACION_POSTULACION',
+    nombre: 'Confirmación de Postulación',
+    asunto: 'Confirmación de Registro - {{convocatoria}}',
+    contenido: `Estimado/a {{nombre}},
 
 Hemos recibido tu registro al servicio:
 {{convocatoria}}
@@ -38,10 +61,14 @@ Recibirás notificaciones sobre cualquier cambio en el estado de tu registro.
 
 Atentamente,
 Equipo DEVIDA`,
-    },
-    cambioEstado: {
-      asunto: 'Actualización de Estado - {{convocatoria}}',
-      contenido: `Estimado/a {{nombre}},
+    activo: 1,
+    version: 1,
+  },
+  cambioEstado: {
+    codigo: 'CAMBIO_ESTADO',
+    nombre: 'Cambio de Estado',
+    asunto: 'Actualización de Estado - {{convocatoria}}',
+    contenido: `Estimado/a {{nombre}},
 
 Te informamos que el estado de tu registro ha sido actualizado:
 
@@ -55,10 +82,14 @@ Para más información, ingresa a tu cuenta en SIRPO.
 
 Atentamente,
 Equipo DEVIDA`,
-    },
-    resultadoFinal: {
-      asunto: 'Resultado Final - {{convocatoria}}',
-      contenido: `Estimado/a {{nombre}},
+    activo: 1,
+    version: 1,
+  },
+  resultadoFinal: {
+    codigo: 'RESULTADO_FINAL',
+    nombre: 'Resultado Final',
+    asunto: 'Resultado Final - {{convocatoria}}',
+    contenido: `Estimado/a {{nombre}},
 
 Te informamos el resultado final de tu registro al servicio:
 {{convocatoria}}
@@ -71,30 +102,140 @@ Agradecemos tu participación en el proceso de selección.
 
 Atentamente,
 Equipo DEVIDA`,
-    },
+    activo: 1,
+    version: 1,
+  },
+};
+
+const cloneDefaultPlantillas = (): Record<PlantillaKey, PlantillaState> => ({
+  bienvenida: { ...DEFAULT_PLANTILLAS.bienvenida },
+  confirmacionPostulacion: { ...DEFAULT_PLANTILLAS.confirmacionPostulacion },
+  cambioEstado: { ...DEFAULT_PLANTILLAS.cambioEstado },
+  resultadoFinal: { ...DEFAULT_PLANTILLAS.resultadoFinal },
+});
+
+const resolvePlantillaKey = (item: PlantillaCorreoItem): PlantillaKey | null => {
+  const raw = `${item.codigo || ''} ${item.nombre || ''}`.toLowerCase();
+  if (raw.includes('bienven')) return 'bienvenida';
+  if (raw.includes('confirm') || raw.includes('registro')) return 'confirmacionPostulacion';
+  if (raw.includes('cambio') || raw.includes('estado')) return 'cambioEstado';
+  if (raw.includes('resultado') || raw.includes('final')) return 'resultadoFinal';
+  return null;
+};
+
+const mergePlantillasFromApi = (
+  items: PlantillaCorreoItem[],
+): Record<PlantillaKey, PlantillaState> => {
+  const next = cloneDefaultPlantillas();
+  items.forEach((item) => {
+    const key = resolvePlantillaKey(item);
+    if (!key) return;
+    const base = next[key];
+    next[key] = {
+      ...base,
+      idPlantilla: item.idPlantilla > 0 ? item.idPlantilla : base.idPlantilla,
+      codigo: item.codigo || base.codigo,
+      nombre: item.nombre || base.nombre,
+      asunto: item.asunto || base.asunto,
+      contenido: item.cuerpo || base.contenido,
+      activo: Number.isFinite(item.activo) ? item.activo : base.activo,
+      version: item.version > 0 ? item.version : base.version,
+    };
   });
+  return next;
+};
 
-  const [selectedPlantilla, setSelectedPlantilla] = useState<keyof typeof plantillas>('bienvenida');
-  const [editedAsunto, setEditedAsunto] = useState(plantillas.bienvenida.asunto);
-  const [editedContenido, setEditedContenido] = useState(plantillas.bienvenida.contenido);
+interface PlantillasCorreoProps {
+  adminUserId?: number;
+}
+
+export function PlantillasCorreo({ adminUserId = 0 }: PlantillasCorreoProps) {
+  const [plantillas, setPlantillas] = useState<Record<PlantillaKey, PlantillaState>>(
+    () => cloneDefaultPlantillas(),
+  );
+
+  const [selectedPlantilla, setSelectedPlantilla] = useState<PlantillaKey>('bienvenida');
+  const [editedAsunto, setEditedAsunto] = useState(DEFAULT_PLANTILLAS.bienvenida.asunto);
+  const [editedContenido, setEditedContenido] = useState(DEFAULT_PLANTILLAS.bienvenida.contenido);
   const [showPreview, setShowPreview] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const handlePlantillaChange = (key: keyof typeof plantillas) => {
+  useEffect(() => {
+    let isActive = true;
+    const loadPlantillas = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const data = await fetchPlantillasCorreo();
+        if (!isActive) return;
+        if (data.length === 0) {
+          setIsLoading(false);
+          return;
+        }
+        const merged = mergePlantillasFromApi(data);
+        setPlantillas(merged);
+        const current = merged[selectedPlantilla] ?? merged.bienvenida;
+        setEditedAsunto(current.asunto);
+        setEditedContenido(current.contenido);
+      } catch (error) {
+        if (!isActive) return;
+        setLoadError('No se pudieron cargar las plantillas.');
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+    loadPlantillas();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const handlePlantillaChange = (key: PlantillaKey) => {
     setSelectedPlantilla(key);
     setEditedAsunto(plantillas[key].asunto);
     setEditedContenido(plantillas[key].contenido);
     setShowPreview(false);
   };
 
-  const handleGuardar = () => {
-    setPlantillas({
-      ...plantillas,
-      [selectedPlantilla]: {
+  const handleGuardar = async () => {
+    if (isSaving) return;
+    const current = plantillas[selectedPlantilla];
+    setIsSaving(true);
+    try {
+      const result = await upsertPlantillaCorreo({
+        idPlantilla: current.idPlantilla ?? 0,
+        codigo: current.codigo,
+        nombre: current.nombre,
         asunto: editedAsunto,
-        contenido: editedContenido,
-      },
-    });
-    alert('Plantilla guardada exitosamente');
+        cuerpo: editedContenido,
+        activo: current.activo ?? 1,
+        version: current.version ?? 1,
+        usuarioAccion: adminUserId,
+      });
+      if (!result.ok) {
+        toast.error('No se pudo guardar la plantilla.');
+        return;
+      }
+      setPlantillas((prev) => ({
+        ...prev,
+        [selectedPlantilla]: {
+          ...prev[selectedPlantilla],
+          asunto: editedAsunto,
+          contenido: editedContenido,
+          idPlantilla: result.idPlantilla ?? prev[selectedPlantilla].idPlantilla,
+          version: result.version ?? prev[selectedPlantilla].version,
+        },
+      }));
+      toast.success('Plantilla guardada exitosamente');
+    } catch (error) {
+      toast.error('No se pudo guardar la plantilla.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleRestaurar = () => {
@@ -123,7 +264,10 @@ Equipo DEVIDA`,
         .replace(/{{fecha}}/g, '11/01/2026')
         .replace(/{{mensaje}}/g, 'Felicitaciones, has sido preseleccionado para la siguiente etapa.')
         .replace(/{{estadoFinal}}/g, 'FINALISTA')
-        .replace(/{{mensajeResultado}}/g, 'Has sido seleccionado como finalista. Pronto nos pondremos en contacto contigo.'),
+        .replace(
+          /{{mensajeResultado}}/g,
+          'Has sido seleccionado como finalista. Pronto nos pondremos en contacto contigo.',
+        ),
     };
   };
 
@@ -140,8 +284,14 @@ Equipo DEVIDA`,
         </p>
       </div>
 
+      {isLoading && <p className="text-sm text-gray-500">Cargando plantillas...</p>}
+      {loadError && <p className="text-sm text-red-600">{loadError}</p>}
+
       {/* Tabs de plantillas */}
-      <Tabs value={selectedPlantilla} onValueChange={(value) => handlePlantillaChange(value as keyof typeof plantillas)}>
+      <Tabs
+        value={selectedPlantilla}
+        onValueChange={(value) => handlePlantillaChange(value as PlantillaKey)}
+      >
         <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
           <TabsTrigger value="bienvenida">Bienvenida</TabsTrigger>
           <TabsTrigger value="confirmacionPostulacion">Confirmación</TabsTrigger>
@@ -199,14 +349,16 @@ Equipo DEVIDA`,
                 <Button
                   onClick={handleGuardar}
                   className="bg-green-600 hover:bg-green-700 gap-2"
+                  disabled={isSaving || isLoading}
                 >
                   <Save className="w-4 h-4" />
-                  Guardar Cambios
+                  {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>
                 <Button
                   onClick={handleRestaurar}
                   variant="outline"
                   className="gap-2"
+                  disabled={isSaving}
                 >
                   <RotateCcw className="w-4 h-4" />
                   Restaurar Defecto
@@ -244,14 +396,17 @@ Equipo DEVIDA`,
 
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-xs text-amber-800">
-                    <strong>Nota:</strong> Esta es una vista previa con datos de ejemplo. Los valores reales se insertarán automáticamente al enviar el correo.
+                    <strong>Nota:</strong> Esta es una vista previa con datos de ejemplo. Los
+                    valores reales se insertarán automáticamente al enviar el correo.
                   </p>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-[400px] text-gray-400">
                 <Eye className="w-16 h-16 mb-4" />
-                <p className="text-sm">Haz clic en "Ver Vista Previa" para visualizar el correo</p>
+                <p className="text-sm">
+                  Haz clic en "Ver Vista Previa" para visualizar el correo
+                </p>
               </div>
             )}
           </Card>

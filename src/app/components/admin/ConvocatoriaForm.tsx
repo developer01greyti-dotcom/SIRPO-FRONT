@@ -354,7 +354,7 @@ export function ConvocatoriaForm({
     e.preventDefault();
     setError('');
 
-    if (!formData.titulo || !formData.idPerfil || !formData.oficinaZonal || !formData.estado) {
+    if (!formData.titulo || !formData.idPerfil || !formData.estado) {
       setError('Complete los campos obligatorios.');
       return;
     }
@@ -457,7 +457,7 @@ export function ConvocatoriaForm({
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4"> 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> 
               <div className="space-y-2"> 
                 <label className="block text-sm font-semibold text-gray-700">Categoría de Servicio *</label> 
                 <select 
@@ -474,20 +474,9 @@ export function ConvocatoriaForm({
                   ))} 
                 </select> 
               </div> 
-
-              <div className="space-y-2"> 
-                <label className="block text-sm font-semibold text-gray-700">Oficina Zonal *</label> 
-                <Input 
-                  value={formData.oficinaZonal} 
-                  readOnly 
-                  placeholder="Selecciona una oficina de coordinación" 
-                  className="bg-gray-50" 
-                /> 
-              </div> 
-
               <div className="space-y-2"> 
                 <label className="block text-sm font-semibold text-gray-700"> 
-                  Oficina de Coordinación (opcional) 
+                  OZ / Oficina de Coordinación
                 </label> 
                 <Select 
                   name="idOficinaCoordinacion" 

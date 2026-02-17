@@ -1,4 +1,4 @@
-import { Users, Briefcase, Mail, LogOut, ChevronLeft, ChevronRight, Shield, User } from 'lucide-react';
+import { Users, Briefcase, Mail, LogOut, ChevronLeft, ChevronRight, Shield, User, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { getRoleLabel, type AdminRole } from '../../utils/roles';
 
@@ -23,6 +23,7 @@ export function AdminSidebar({
     { id: 'registros', icon: Users, label: 'Registros', roles: ['gestor', 'superadmin', 'date', 'uaba'] },
     { id: 'servicios', icon: Briefcase, label: 'Servicios', roles: ['superadmin', 'date'] },
     { id: 'plantillas', icon: Mail, label: 'Plantillas de Correo', roles: ['superadmin', 'date'] },
+    { id: 'declaraciones', icon: FileText, label: 'Declaraciones Juradas', roles: ['superadmin', 'date'] },
     { id: 'usuarios', icon: Shield, label: 'Gestión de Usuarios', roles: ['superadmin', 'date'] },
   ];
 
@@ -106,3 +107,4 @@ export function AdminSidebar({
     </aside>
   );
 }
+

@@ -122,12 +122,14 @@ export function ConvocatoriasTable({
   };
 
   const isPublicado = (conv: Convocatoria) => {
+    const normalized = (conv.estado || '').toLowerCase();
+    if (normalized.includes('inact')) return false;
+    if (normalized.includes('act')) return true;
+    if (normalized.includes('public')) return true;
     if (conv.estadoId !== undefined && conv.estadoId !== null && conv.estadoId !== '') {
       return String(conv.estadoId) === '0';
     }
-    const normalized = (conv.estado || '').toLowerCase();
-    if (normalized.includes('inact')) return false;
-    return normalized.includes('public');
+    return false;
   };
 
   return (

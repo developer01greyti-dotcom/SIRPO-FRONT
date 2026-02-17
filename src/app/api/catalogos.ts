@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, publicApiClient } from './client';
 
 export interface DropdownItem {
   id: number | string;
@@ -12,6 +12,11 @@ export const fetchSexoDropdown = async (): Promise<DropdownItem[]> => {
 
 export const fetchTipoDocDropdown = async (): Promise<DropdownItem[]> => {
   const response = await apiClient.get<DropdownItem[]>('/tipodoc/dropdown');
+  return response.data;
+};
+
+export const fetchTipoDocDropdownPublic = async (): Promise<DropdownItem[]> => {
+  const response = await publicApiClient.get<DropdownItem[]>('/tipodoc/dropdown');
   return response.data;
 };
 

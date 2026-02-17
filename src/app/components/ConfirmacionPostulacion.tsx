@@ -55,7 +55,6 @@ export function ConfirmacionPostulacion({
             <ul className="text-xs text-yellow-700 space-y-1">
               <li>• Podrás revisar tu hoja de vida antes de registrarte al servicio</li>
               <li>• Si necesitas hacer cambios, podrás regresar a editar tu información</li>
-              <li>• Recuerda que solo puedes registrarte a 2 servicios por cada Oficina Zonal</li>
             </ul>
           </div>
         </div>

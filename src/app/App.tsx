@@ -29,6 +29,7 @@ import { AdminSidebar } from './components/admin/AdminSidebar';
 import { GestionPostulaciones } from './components/admin/GestionPostulaciones';
 import { GestionConvocatorias } from './components/admin/GestionConvocatorias';
 import { PlantillasCorreo } from './components/admin/PlantillasCorreo';
+import { DeclaracionesJuradasAdmin } from './components/admin/DeclaracionesJuradasAdmin';
 import { GestionUsuariosAdmin } from './components/admin/GestionUsuariosAdmin';
 import type { LoginResponse } from './api/auth';
 import { fetchConvocatoriasList } from './api/convocatorias';
@@ -648,6 +649,7 @@ export default function App() {
     if (section === 'registros') return true;
     if (section === 'servicios') return role === 'superadmin' || role === 'date';
     if (section === 'plantillas') return role === 'superadmin' || role === 'date';
+    if (section === 'declaraciones') return role === 'superadmin' || role === 'date';
     if (section === 'usuarios') return role === 'superadmin' || role === 'date';
     return false;
   };
@@ -850,50 +852,20 @@ export default function App() {
     } 
   }; 
 
-  const normalizeOzName = (value: string) => value.trim().toUpperCase();
-
-  const getConvocatoriaOzKey = (conv: Convocatoria) => {
-    if (conv.idOficinaZonal) return `id:${conv.idOficinaZonal}`;
-    const oficinaZonalName =
-      conv.oficinaZonal ||
-      (conv.oficinaCoordinacion
-        ? conv.oficinaCoordinacion.split('/')[0]?.trim() || ''
-        : '');
-    if (oficinaZonalName) return `name:${normalizeOzName(oficinaZonalName)}`;
-    return '';
-  };
-
   const buildPostulacionesResumen = (items: PostulacionListItem[]) => {
-    const byOz = new Map<string, number>();
-    const ozSet = new Set<string>();
     const byConvocatoria = new Set<string>();
     items.forEach((item) => {
-      const ozIdKey = item.idOficinaZonal ? `id:${item.idOficinaZonal}` : '';
-      const ozNameKey = item.oficinaZonal ? `name:${normalizeOzName(item.oficinaZonal)}` : '';
-      const canonicalKey = ozIdKey || ozNameKey;
-
-      if (ozIdKey) {
-        byOz.set(ozIdKey, (byOz.get(ozIdKey) || 0) + 1);
-      }
-      if (ozNameKey) {
-        byOz.set(ozNameKey, (byOz.get(ozNameKey) || 0) + 1);
-      }
-      if (canonicalKey) {
-        ozSet.add(canonicalKey);
-      }
       if (item.idConvocatoria) {
         byConvocatoria.add(String(item.idConvocatoria));
       }
     });
-    return { byOz, ozSet, byConvocatoria };
+    return { byConvocatoria };
   };
 
   const postulacionesResumen = buildPostulacionesResumen(postulaciones);
 
   if (typeof window !== 'undefined') {
     (window as any).postulacionesResumen = {
-      byOz: Array.from(postulacionesResumen.byOz.entries()),
-      ozSet: Array.from(postulacionesResumen.ozSet.values()),
       byConvocatoria: Array.from(postulacionesResumen.byConvocatoria.values()),
     };
   }
@@ -1077,7 +1049,10 @@ export default function App() {
               adminOficinaZonal={adminOficinaZonal || undefined}
             />
           )}
-          {adminSection === 'plantillas' && <PlantillasCorreo />}
+          {adminSection === 'plantillas' && (
+            <PlantillasCorreo adminUserId={adminUserId} />
+          )}
+          {adminSection === 'declaraciones' && <DeclaracionesJuradasAdmin />}
           {adminSection === 'usuarios' && (
             <GestionUsuariosAdmin adminUserId={adminUserId} adminRole={adminRole} />
           )}

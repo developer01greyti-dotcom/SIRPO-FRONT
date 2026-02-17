@@ -13,9 +13,10 @@ import {
 } from '../ui/select';
 import { Checkbox } from '../ui/checkbox';
 import { useEffect, useState } from 'react';
-import { fetchTipoDocDropdown, type DropdownItem } from '../../api/catalogos';
+import { fetchTipoDocDropdownPublic, type DropdownItem } from '../../api/catalogos';
 import { registerPostulante, type RegisterResponse } from '../../api/auth';
 import { pedirDNI, pedirMigraciones, pedirRUC } from '../../api/pide';
+import { toast } from 'sonner';
 
 interface RegisterFormProps {
   onRegister: (user: RegisterResponse) => void;
@@ -28,6 +29,8 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
   const [tipoDocumento, setTipoDocumento] = useState<string>('');
   const [tipoDocumentoDesc, setTipoDocumentoDesc] = useState<string>('');
   const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<DropdownItem[]>([]);
+  const [isTipoDocumentoLoading, setIsTipoDocumentoLoading] = useState(false);
+  const [tipoDocumentoError, setTipoDocumentoError] = useState('');
   const [formError, setFormError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearchingDoc, setIsSearchingDoc] = useState(false);
@@ -39,21 +42,33 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
   const [apellidoMaterno, setApellidoMaterno] = useState('');
   const [numeroRuc, setNumeroRuc] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
+  const [nacionalidad, setNacionalidad] = useState('');
+  const [sexo, setSexo] = useState('');
+  const [estadoCivil, setEstadoCivil] = useState('');
 
   useEffect(() => {
     let isActive = true;
 
     const loadTipoDocumento = async () => {
       try {
-        const items = await fetchTipoDocDropdown();
+        setIsTipoDocumentoLoading(true);
+        setTipoDocumentoError('');
+        const items = await fetchTipoDocDropdownPublic();
         if (!isActive) return;
-        setTipoDocumentoOptions(items);
+        setTipoDocumentoOptions(items || []);
         if (items.length > 0) {
           setTipoDocumento(String(items[0].id));
           setTipoDocumentoDesc(items[0].descripcion);
         }
       } catch (error) {
+        if (!isActive) return;
+        setTipoDocumentoOptions([]);
+        setTipoDocumentoError('No se pudieron cargar los tipos de documento.');
         console.error('Error loading tipoDocumento', error);
+      } finally {
+        if (isActive) {
+          setIsTipoDocumentoLoading(false);
+        }
       }
     };
 
@@ -118,23 +133,57 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
       nombres: nombresValue,
       email,
       password,
+      ruc: numeroRuc.trim() || undefined,
     };
 
     try {
       setIsSubmitting(true);
       const response = await registerPostulante(payload);
-      onRegister(response);
+      const normalizedUser: RegisterResponse = {
+        ...response,
+        tipoDocumento: response.tipoDocumento || payload.tipoDocumento,
+        numeroDocumento: response.numeroDocumento || payload.numeroDocumento,
+        apellidoPaterno: response.apellidoPaterno || payload.apellidoPaterno,
+        apellidoMaterno: response.apellidoMaterno || payload.apellidoMaterno,
+        nombres: response.nombres || payload.nombres,
+        email: response.email || payload.email,
+        ruc: response.ruc || numeroRuc.trim(),
+        nacionalidad:
+          response.nacionalidad ||
+          nacionalidad ||
+          (tipoDocumentoDesc.toLowerCase().includes('dni') ? 'PERUANA' : ''),
+        sexo: response.sexo || sexo,
+        estadoCivil: response.estadoCivil || estadoCivil,
+      };
+      onRegister(normalizedUser);
     } catch (error) {
       console.error('Error al registrar', error);
+      const rawData = (error as any)?.response?.data;
+      const rawText =
+        typeof rawData === 'string' ? rawData : rawData ? JSON.stringify(rawData) : '';
       const message =
-        (error as any)?.response?.data?.message ||
-        (error as any)?.response?.data?.error ||
+        rawText ||
+        rawData?.message ||
+        rawData?.error ||
         (error as any)?.message ||
         '';
-      if (typeof message === 'string' && message.toLowerCase().includes('documento ya registrado')) {
-        setFormError('Documento ya registrado.');
+      const normalized = String(message || '').toLowerCase();
+      if (normalized.includes('documento ya registrado') || normalized.includes('ora-20002')) {
+        const msg = 'Documento ya registrado.';
+        setFormError(msg);
+        toast.error(msg);
+      } else if (normalized.includes('email ya registrado') || normalized.includes('ora-20003')) {
+        const msg = 'Email ya registrado.';
+        setFormError(msg);
+        toast.error(msg);
+      } else if (normalized.includes('datos obligatorios') || normalized.includes('ora-20001')) {
+        const msg = 'Datos obligatorios incompletos.';
+        setFormError(msg);
+        toast.error(msg);
       } else {
-        setFormError('Error al registrar. Intente nuevamente.');
+        const msg = 'Error al registrar. Intente nuevamente.';
+        setFormError(msg);
+        toast.error(msg);
       }
     } finally {
       setIsSubmitting(false);
@@ -248,6 +297,25 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
             'segundoApellido',
             'apellido2',
           ]) || pickValue(data, ['apellidoMaterno', 'apellido_materno', 'apSegundo']);
+        const sexoResp =
+          pickValue(payload, [
+            'sexo',
+            'sexoDesc',
+            'sexoDescripcion',
+            'genero',
+            'generoDesc',
+            'generoDescripcion',
+            'sexo_desc',
+          ]) || pickValue(data, ['sexo', 'genero', 'sexo_desc']);
+        const estadoCivilResp =
+          pickValue(payload, [
+            'estadoCivil',
+            'estado_civil',
+            'estadoCivilDesc',
+            'estadoCivilDescripcion',
+            'estCivil',
+            'estcivil',
+          ]) || pickValue(data, ['estadoCivil', 'estado_civil', 'estCivil', 'estcivil']);
         if (!nombresResp && !apellidoPatResp && !apellidoMatResp) {
           setFormError('No se encontraron datos para el DNI.');
           return;
@@ -255,6 +323,9 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
         if (nombresResp) setNombres(nombresResp);
         if (apellidoPatResp) setApellidoPaterno(apellidoPatResp);
         if (apellidoMatResp) setApellidoMaterno(apellidoMatResp);
+        if (sexoResp) setSexo(sexoResp);
+        if (estadoCivilResp) setEstadoCivil(estadoCivilResp);
+        setNacionalidad('PERUANA');
         return;
       }
       if (desc.includes('carnet') || desc.includes('extranjer') || desc.includes('ce')) {
@@ -279,6 +350,34 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
             'segundoApellido',
             'apellido2',
           ]) || pickValue(data, ['apellidoMaterno', 'segundoApellido']);
+        const nacionalidadResp =
+          pickValue(payload, [
+            'nacionalidad',
+            'nacionalidadDesc',
+            'nacionalidadDescripcion',
+            'pais',
+            'paisNacimiento',
+            'paisNac',
+            'pais_nacimiento',
+            'nacionalidad_desc',
+          ]) || pickValue(data, ['nacionalidad', 'pais', 'paisNacimiento', 'nacionalidad_desc']);
+        const sexoResp =
+          pickValue(payload, [
+            'sexo',
+            'genero',
+            'sexoDesc',
+            'generoDesc',
+            'sexoDescripcion',
+            'generoDescripcion',
+          ]) || pickValue(data, ['sexo', 'genero']);
+        const estadoCivilResp =
+          pickValue(payload, [
+            'estadoCivil',
+            'estado_civil',
+            'estadoCivilDesc',
+            'estadoCivilDescripcion',
+            'estcivil',
+          ]) || pickValue(data, ['estadoCivil', 'estado_civil', 'estcivil']);
         if (!nombresResp && !apellidoPatResp && !apellidoMatResp) {
           setFormError('No se encontraron datos para el carnet de extranjeria.');
           return;
@@ -286,6 +385,9 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
         if (nombresResp) setNombres(nombresResp);
         if (apellidoPatResp) setApellidoPaterno(apellidoPatResp);
         if (apellidoMatResp) setApellidoMaterno(apellidoMatResp);
+        if (nacionalidadResp) setNacionalidad(nacionalidadResp);
+        if (sexoResp) setSexo(sexoResp);
+        if (estadoCivilResp) setEstadoCivil(estadoCivilResp);
         return;
       }
       setFormError('Tipo de documento no soportado para busqueda.');
@@ -387,13 +489,17 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                     setTipoDocumentoDesc(selected?.descripcion || '');
                   }}
                 >
-                  <SelectTrigger className="h-9 py-1">
-                    <SelectValue placeholder="Seleccionar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                  {tipoDocumentoOptions.length === 0 ? (
+                <SelectTrigger className="h-9 py-1">
+                  <SelectValue placeholder="Seleccionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {isTipoDocumentoLoading ? (
                     <SelectItem value="loading" disabled>
                       Cargando...
+                    </SelectItem>
+                  ) : tipoDocumentoOptions.length === 0 ? (
+                    <SelectItem value="empty" disabled>
+                      {tipoDocumentoError || 'Sin resultados'}
                     </SelectItem>
                   ) : (
                     tipoDocumentoOptions.map((item) => (
@@ -404,6 +510,9 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   )}
                 </SelectContent>
                 </Select>
+                {tipoDocumentoError && (
+                  <p className="text-xs text-red-600">{tipoDocumentoError}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-[1fr_auto] gap-2 items-end">

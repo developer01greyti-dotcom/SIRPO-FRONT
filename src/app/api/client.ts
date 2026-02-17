@@ -5,18 +5,48 @@ const baseURL =
   (import.meta as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ||
   'http://localhost:8087/sirpo/v1';
 
+const publicBaseURL =
+  (import.meta as { env?: { VITE_PUBLIC_API_BASE_URL?: string } }).env?.VITE_PUBLIC_API_BASE_URL ||
+  baseURL;
+
 export const apiClient = axios.create({
   baseURL,
   withCredentials: true,
 });
 
+export const publicApiClient = axios.create({
+  baseURL: publicBaseURL,
+  withCredentials: true,
+});
+
+const pickTokenFromRaw = (raw: string | null) => {
+  if (!raw) return '';
+  try {
+    const parsed = JSON.parse(raw) as { token?: string; accessToken?: string; jwt?: string };
+    const token = parsed?.token || parsed?.accessToken || parsed?.jwt || '';
+    return typeof token === 'string' ? token : '';
+  } catch {
+    return '';
+  }
+};
+
 const getStoredAuthToken = () => {
   if (typeof window === 'undefined') return '';
-  return (
+  const direct =
     localStorage.getItem('sirpo.authToken') ||
     sessionStorage.getItem('sirpo.authToken') ||
-    ''
-  );
+    '';
+  if (direct) return direct;
+
+  const adminToken =
+    pickTokenFromRaw(localStorage.getItem('sirpo.adminAuth')) ||
+    pickTokenFromRaw(sessionStorage.getItem('sirpo.adminAuth'));
+  if (adminToken) return adminToken;
+
+  const postulanteToken =
+    pickTokenFromRaw(localStorage.getItem('sirpo.postulanteUser')) ||
+    pickTokenFromRaw(sessionStorage.getItem('sirpo.postulanteUser'));
+  return postulanteToken || '';
 };
 
 apiClient.interceptors.request.use((config) => {
@@ -27,6 +57,20 @@ apiClient.interceptors.request.use((config) => {
     }
     config.headers.Authorization = `Bearer ${token}`;
     config.headers['X-Auth-Token'] = token;
+  }
+  return config;
+});
+
+publicApiClient.interceptors.request.use((config) => {
+  const publicToken =
+    (import.meta as { env?: { VITE_PUBLIC_API_TOKEN?: string } }).env?.VITE_PUBLIC_API_TOKEN ||
+    '';
+  if (publicToken) {
+    if (!config.headers) {
+      config.headers = {};
+    }
+    config.headers.Authorization = `Bearer ${publicToken}`;
+    config.headers['X-Auth-Token'] = publicToken;
   }
   return config;
 });

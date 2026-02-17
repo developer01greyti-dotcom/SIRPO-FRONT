@@ -264,6 +264,12 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
       apellidoMaterno: user.apellidoMaterno || '',
 
+      sexo: user.sexo || '',
+
+      estadoCivil: user.estadoCivil || '',
+
+      nacionalidad: user.nacionalidad || '',
+
       correo: user.email || '',
 
       ruc: user.ruc || '',
@@ -271,6 +277,39 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     };
 
   }, [user]);
+
+  const isDniSelected = useMemo(() => {
+    const selected = tipoDocumentoOptions.find(
+      (item) => String(item.id) === String(formData.tipoDocumento),
+    );
+    const desc = String(selected?.descripcion || '').toLowerCase();
+    if (desc.includes('dni') || desc.includes('documento nacional')) {
+      return true;
+    }
+    const raw = String(formData.tipoDocumento || '').toLowerCase();
+    return raw.includes('dni') || raw.includes('documento nacional');
+  }, [formData.tipoDocumento, tipoDocumentoOptions]);
+
+  const normalizeDropdownLabel = (value: string) => value.trim().toLowerCase();
+
+  const resolveDropdownId = (
+    value: string,
+    options: DropdownItem[],
+    aliases: Record<string, string> = {},
+  ) => {
+    if (!value) return '';
+    const raw = String(value).trim();
+    if (!raw) return '';
+    const exists = options.some((item) => String(item.id) === raw);
+    if (exists) return raw;
+    const normalized = normalizeDropdownLabel(raw);
+    const mapped = aliases[normalized] || normalized;
+    const match = options.find((item) => {
+      const desc = normalizeDropdownLabel(String(item.descripcion || ''));
+      return desc === mapped || desc.includes(mapped);
+    });
+    return match ? String(match.id) : raw;
+  };
 
 
 
@@ -544,21 +583,44 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
         }
 
-        setFormData((prev) => ({
+        const coalesceValue = (value: any, fallback: any) => {
+          if (value === undefined || value === null) return fallback;
+          if (typeof value === 'string' && value.trim() === '') return fallback;
+          return value;
+        };
 
-          ...prev,
-
+        setFormData({
+          ...authDefaults,
           ...datos,
-
-          tipoDocumento: String(datos.tipoDocumentoId ?? datos.tipoDocumento ?? ''),
-
-          sexo: String(datos.sexoId ?? datos.sexo ?? ''),
-
-          estadoCivil: String(datos.estadoCivilId ?? datos.estadoCivil ?? ''),
-
-          fechaNacimiento: normalizeFechaFromApi(datos.fechaNacimiento),
-
-        }));
+          tipoDocumento: String(
+            coalesceValue(
+              datos.tipoDocumentoId ?? datos.tipoDocumento,
+              authDefaults.tipoDocumento,
+            ),
+          ),
+          numeroDocumento: String(
+            coalesceValue(datos.numeroDocumento, authDefaults.numeroDocumento),
+          ),
+          nombres: String(coalesceValue(datos.nombres, authDefaults.nombres)),
+          apellidoPaterno: String(
+            coalesceValue(datos.apellidoPaterno, authDefaults.apellidoPaterno),
+          ),
+          apellidoMaterno: String(
+            coalesceValue(datos.apellidoMaterno, authDefaults.apellidoMaterno),
+          ),
+          sexo: String(coalesceValue(datos.sexoId ?? datos.sexo, authDefaults.sexo)),
+          estadoCivil: String(
+            coalesceValue(datos.estadoCivilId ?? datos.estadoCivil, authDefaults.estadoCivil),
+          ),
+          nacionalidad: String(
+            coalesceValue(datos.nacionalidad, authDefaults.nacionalidad),
+          ),
+          correo: String(coalesceValue(datos.correo, authDefaults.correo)),
+          ruc: String(coalesceValue(datos.ruc, authDefaults.ruc)),
+          fechaNacimiento: normalizeFechaFromApi(
+            String(coalesceValue(datos.fechaNacimiento, '')),
+          ),
+        });
 
         setHvDatosId(datos.idHvDatos ? Number(datos.idHvDatos) : 0);
 
@@ -611,6 +673,44 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
     setFormData((prev) => ({ ...prev, [field]: value }));
 
   };
+
+  useEffect(() => {
+    if (!isDniSelected) return;
+    const current = (formData.nacionalidad || '').trim().toUpperCase();
+    if (current === 'PERUANA') return;
+    setFormData((prev) => ({ ...prev, nacionalidad: 'PERUANA' }));
+  }, [isDniSelected, formData.nacionalidad]);
+
+  useEffect(() => {
+    if (!sexoOptions.length || !formData.sexo) return;
+    const mapped = resolveDropdownId(formData.sexo, sexoOptions, {
+      m: 'masculino',
+      masculino: 'masculino',
+      f: 'femenino',
+      femenino: 'femenino',
+    });
+    if (mapped !== formData.sexo) {
+      updateField('sexo', mapped);
+    }
+  }, [formData.sexo, sexoOptions]);
+
+  useEffect(() => {
+    if (!estadoCivilOptions.length || !formData.estadoCivil) return;
+    const mapped = resolveDropdownId(formData.estadoCivil, estadoCivilOptions, {
+      soltero: 'soltero',
+      soltera: 'soltero',
+      casado: 'casado',
+      casada: 'casado',
+      divorciado: 'divorciado',
+      divorciada: 'divorciado',
+      viudo: 'viudo',
+      viuda: 'viudo',
+      conviviente: 'conviviente',
+    });
+    if (mapped !== formData.estadoCivil) {
+      updateField('estadoCivil', mapped);
+    }
+  }, [formData.estadoCivil, estadoCivilOptions]);
 
 
 
@@ -824,6 +924,14 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
       setSaveMessage(`Complete los campos obligatorios: ${missingRequired.join(', ')}.`);
       setSaveMessageType('error');
       return;
+    }
+    if (isDniSelected) {
+      const current = (formData.nacionalidad || '').trim().toUpperCase();
+      if (current !== 'PERUANA') {
+        setSaveMessage('Si el documento es DNI, la nacionalidad debe ser Peruana.');
+        setSaveMessageType('error');
+        return;
+      }
     }
 
     const hasVoucher = !voucherDeleted && Boolean(voucherFile || voucherPreview || voucherRefId || voucherFileUrl);
@@ -1528,6 +1636,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 value={formData.nacionalidad}
 
                 onChange={(e) => updateField('nacionalidad', e.target.value)}
+                readOnly={isDniSelected}
+                className={isDniSelected ? 'bg-gray-50' : undefined}
 
                 required
 
