@@ -15,7 +15,6 @@ import { RecoveryForm } from './components/auth/RecoveryForm';
 import { DatosPersonales } from './components/hoja-vida/DatosPersonales';
 import { FormacionAcademica } from './components/hoja-vida/FormacionAcademica';
 import { ExperienciaProfesional } from './components/hoja-vida/ExperienciaProfesional';
-import { DeclaracionesJuradas } from './components/hoja-vida/DeclaracionesJuradas';
 import { VistaPrevia } from './components/hoja-vida/VistaPrevia';
 import { ConfirmacionPostulacion } from './components/ConfirmacionPostulacion';
 import { InterfazPostulacion } from './components/InterfazPostulacion';
@@ -308,8 +307,11 @@ export default function App() {
   const [activeSection, setActiveSection] = useState(
     storedAuth.activeSection || 'hoja-vida',
   );
+  const hojaVidaTabs = ['datos-personales', 'formacion', 'experiencia', 'vista-previa'];
   const [activeTab, setActiveTab] = useState(
-    storedAuth.activeTab || 'datos-personales',
+    hojaVidaTabs.includes(storedAuth.activeTab || '')
+      ? storedAuth.activeTab
+      : 'datos-personales',
   );
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [filteredConvocatorias, setFilteredConvocatorias] = useState<Convocatoria[]>([]);
@@ -319,6 +321,7 @@ export default function App() {
   const [hojaVidaCompleta, setHojaVidaCompleta] = useState(false); // Cambiar a false para simular hoja de vida incompleta 
   const [hojaVidaId, setHojaVidaId] = useState<number>(0);
   const [postulaciones, setPostulaciones] = useState<PostulacionListItem[]>([]);
+  const [isSubmittingPostulacion, setIsSubmittingPostulacion] = useState(false);
   const [isPostulacionesLoading, setIsPostulacionesLoading] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [registroPopup, setRegistroPopup] = useState<string | null>(null);
@@ -807,53 +810,58 @@ export default function App() {
     setSelectedConvocatoria(null);
   };
 
-  const handleCompletarPostulacion = async () => { 
-    if (!selectedConvocatoria || !postulanteUser) { 
-      alert('No se encontró información de la postulación.'); 
-      return; 
-    } 
-    const data = await loadPostulaciones();
-    const bloqueo = getBloqueoConvocatoria(selectedConvocatoria, data);
+  const handleCompletarPostulacion = async () => {
+    if (isSubmittingPostulacion) {
+      return;
+    }
+    if (!selectedConvocatoria || !postulanteUser) {
+      alert('No se encontr? informaci?n de la postulaci?n.');
+      return;
+    }
+    const bloqueo = getBloqueoConvocatoria(selectedConvocatoria, postulaciones);
     if (bloqueo.blocked) {
       alert(bloqueo.reason || 'No puedes registrarte en este servicio.');
       return;
     }
-    if (!hojaVidaId) { 
-      alert('No se encontró la hoja de vida.'); 
-      return; 
-    } 
-    const idConvocatoria = Number(selectedConvocatoria.id || 0); 
-    if (!idConvocatoria) { 
-      alert('No se encontró el servicio seleccionado.'); 
-      return; 
-    } 
-    try { 
-      const numeroPostulacion = await upsertPostulacion({ 
-        idPostulacion: 0, 
-        idPersona: postulanteUser.idPersona, 
-        idConvocatoria, 
-        idHojaVida: hojaVidaId, 
-        numeroPostulacion: '', 
-        estado: 'registrado', 
-        observacion: '', 
-        usuarioAccion: postulanteUser.idUsuario, 
-      }); 
+    if (!hojaVidaId) {
+      alert('No se encontr? la hoja de vida.');
+      return;
+    }
+    const idConvocatoria = Number(selectedConvocatoria.id || 0);
+    if (!idConvocatoria) {
+      alert('No se encontr? el servicio seleccionado.');
+      return;
+    }
+    try {
+      setIsSubmittingPostulacion(true);
+      const numeroPostulacion = await upsertPostulacion({
+        idPostulacion: 0,
+        idPersona: postulanteUser.idPersona,
+        idConvocatoria,
+        idHojaVida: hojaVidaId,
+        numeroPostulacion: '',
+        estado: 'registrado',
+        observacion: '',
+        usuarioAccion: postulanteUser.idUsuario,
+      });
       setRegistroPopup(
         numeroPostulacion
-          ? `Registro completado. N° ${numeroPostulacion}.`
+          ? `Registro completado. N? ${numeroPostulacion}.`
           : 'Registro completado.',
       );
-      loadPostulaciones();
-      setActiveSection('convocatorias'); 
-      setSelectedConvocatoria(null); 
-      navigate('/servicios'); 
-    } catch (error: any) { 
+      void loadPostulaciones();
+      setActiveSection('convocatorias');
+      setSelectedConvocatoria(null);
+      navigate('/servicios');
+    } catch (error: any) {
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
         'No se pudo completar el registro.';
-      alert(message); 
-    } 
+      alert(message);
+    } finally {
+      setIsSubmittingPostulacion(false);
+    }
   }; 
 
   const buildPostulacionesResumen = (items: PostulacionListItem[]) => {
@@ -1056,7 +1064,7 @@ export default function App() {
           {adminSection === 'plantillas' && (
             <PlantillasCorreo adminUserId={adminUserId} />
           )}
-          {adminSection === 'declaraciones' && <DeclaracionesJuradasAdmin />}
+          {adminSection === 'declaraciones' && <DeclaracionesJuradasAdmin adminUserId={adminUserId} />}
           {adminSection === 'usuarios' && (
             <GestionUsuariosAdmin adminUserId={adminUserId} adminRole={adminRole} />
           )}
@@ -1129,11 +1137,10 @@ export default function App() {
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full grid grid-cols-5 mb-6 print:hidden">
+              <TabsList className="w-full grid grid-cols-4 mb-6 print:hidden">
                 <TabsTrigger value="datos-personales">Datos Personales</TabsTrigger>
                 <TabsTrigger value="formacion">Formación</TabsTrigger>
                 <TabsTrigger value="experiencia">Experiencia</TabsTrigger>
-                <TabsTrigger value="declaraciones">Declaraciones Juradas</TabsTrigger>
                 <TabsTrigger value="vista-previa">Vista Previa</TabsTrigger>
               </TabsList>
 
@@ -1147,10 +1154,6 @@ export default function App() {
 
               <TabsContent value="experiencia" className="space-y-6">
                 <ExperienciaProfesional user={postulanteUser} />
-              </TabsContent>
-
-              <TabsContent value="declaraciones" className="space-y-6">
-                <DeclaracionesJuradas user={postulanteUser} />
               </TabsContent>
 
               <TabsContent value="vista-previa" className="space-y-6">
@@ -1167,7 +1170,7 @@ export default function App() {
                       variant="outline"
                       className="gap-2"
                       onClick={() => {
-                        const tabs = ['datos-personales', 'formacion', 'experiencia', 'declaraciones'];
+                        const tabs = ['datos-personales', 'formacion', 'experiencia'];
                         const currentIndex = tabs.indexOf(activeTab);
                         if (currentIndex > 0) {
                           setActiveTab(tabs[currentIndex - 1]);
@@ -1181,7 +1184,7 @@ export default function App() {
                   <Button 
                     className="gap-2 bg-green-600 hover:bg-green-700 ml-auto"
                     onClick={() => {
-                      const tabs = ['datos-personales', 'formacion', 'experiencia', 'declaraciones', 'vista-previa'];
+                      const tabs = ['datos-personales', 'formacion', 'experiencia', 'vista-previa'];
                       const currentIndex = tabs.indexOf(activeTab);
                       if (currentIndex < tabs.length - 1) {
                         setActiveTab(tabs[currentIndex + 1]);
@@ -1197,7 +1200,7 @@ export default function App() {
                   <Button
                     variant="outline"
                     className="gap-2"
-                    onClick={() => setActiveTab('declaraciones')}
+                    onClick={() => setActiveTab('experiencia')}
                   >
                     <ChevronLeft className="w-4 h-4" />
                     Anterior
@@ -1215,6 +1218,7 @@ export default function App() {
                 onClose={handleCerrarPostulacion}
                 onCompletarPostulacion={handleCompletarPostulacion}
                 onRealizarCambios={handleRealizarCambios}
+                isSubmitting={isSubmittingPostulacion}
               />
             )}
           </div>

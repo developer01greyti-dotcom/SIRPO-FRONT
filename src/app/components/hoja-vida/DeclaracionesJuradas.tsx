@@ -158,7 +158,7 @@ export function DeclaracionesJuradas({ user }: { user: LoginResponse | null }) {
     if (declaracion.archivoAdjunto) {
       const link = document.createElement("a");
       link.href = declaracion.archivoAdjunto.preview;
-      link.download = `${declaracion.nombre}.pdf`;
+      link.download = declaracion.archivoAdjunto.file.name || `${declaracion.nombre}.docx`;
       link.click();
     }
   };
@@ -204,8 +204,25 @@ export function DeclaracionesJuradas({ user }: { user: LoginResponse | null }) {
               Declaraciones Juradas
             </h3>
             <p className="text-sm text-gray-600 mt-1">
-              Descarga, firma y adjunta las declaraciones juradas requeridas
+              Sube el archivo Word con variables para que el sistema complete tus datos automaticamente.
             </p>
+          </div>
+
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs font-semibold text-blue-900 mb-2">Variables disponibles (usar llaves):</p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
+              <div>- {'{'}nombre{'}'} - Nombres del postulante</div>
+              <div>- {'{'}apellidos{'}'} - Apellidos del postulante</div>
+              <div>- {'{'}apellido paterno{'}'} - Apellido paterno</div>
+              <div>- {'{'}apellido materno{'}'} - Apellido materno</div>
+              <div>- {'{'}documento{'}'} - Numero de documento</div>
+              <div>- {'{'}correo{'}'} - Correo electronico</div>
+              <div>- {'{'}ruc{'}'} - RUC</div>
+              <div>- {'{'}direccion{'}'} - Direccion</div>
+              <div>- {'{'}telefono{'}'} - Telefono / celular</div>
+              <div>- {'{'}fecha{'}'} - Fecha actual</div>
+              <div>- {'{'}anio{'}'} - Ano actual</div>
+            </div>
           </div>
 
           {isLoading ? (
@@ -222,8 +239,8 @@ export function DeclaracionesJuradas({ user }: { user: LoginResponse | null }) {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">#</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Declaración Jurada</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Descripción</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Declaracion Jurada</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Descripcion</th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Plantilla</th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Archivo Adjunto</th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Acciones</th>
@@ -241,7 +258,7 @@ export function DeclaracionesJuradas({ user }: { user: LoginResponse | null }) {
                             onClick={() => {
                               const link = document.createElement("a");
                               link.href = declaracion.plantillaUrl;
-                              link.download = `Plantilla_${declaracion.nombre}.pdf`;
+                              link.download = `Plantilla_${declaracion.nombre}.docx`;
                               link.click();
                             }}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors"
@@ -267,7 +284,7 @@ export function DeclaracionesJuradas({ user }: { user: LoginResponse | null }) {
                           <input
                             type="file"
                             id={`file-${declaracion.id}`}
-                            accept="image/*,application/pdf"
+                            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             onChange={(e) => handleFileChange(declaracion.id, e)}
                             className="hidden"
                           />
@@ -310,7 +327,7 @@ export function DeclaracionesJuradas({ user }: { user: LoginResponse | null }) {
                               size="sm"
                               onClick={() => setConfirmDelete(declaracion)}
                               className="gap-1 h-7 px-2 text-red-600 hover:text-red-700 hover:border-red-300"
-                              title="Eliminar declaración"
+                              title="Eliminar declaracion"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
@@ -329,16 +346,16 @@ export function DeclaracionesJuradas({ user }: { user: LoginResponse | null }) {
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-            <h4 className="text-lg font-semibold text-gray-900">¿Eliminar declaración jurada?</h4>
+            <h4 className="text-lg font-semibold text-gray-900">Eliminar declaracion jurada?</h4>
             <p className="mt-2 text-sm text-gray-600">
-              Esta acción no se puede deshacer. Se eliminará el registro seleccionado.
+              Esta accion no se puede deshacer. Se eliminara el registro seleccionado.
             </p>
             <div className="mt-4 flex items-center justify-end gap-3">
               <Button variant="outline" onClick={() => setConfirmDelete(null)}>
                 No
               </Button>
               <Button variant="destructive" onClick={handleEliminarDeclaracion}>
-                Sí, eliminar
+                Si, eliminar
               </Button>
             </div>
           </div>

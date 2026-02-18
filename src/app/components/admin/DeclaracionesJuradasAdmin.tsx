@@ -1,114 +1,217 @@
-import { useRef, useState } from 'react';
-import { FileText, Save, Eye, RotateCcw, Plus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { FileText, Save, RotateCcw, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
+import type { DeclaracionTipo } from '../../api/declaraciones';
+import { fetchHvRefArchivo, saveHvRefArchivo, type HvRefArchivo } from '../../api/hvRefArchivo';
 
 type DeclaracionItem = {
   id: string;
+  idDeclaracionTipo?: number;
   titulo: string;
-  contenido: string;
+  descripcion: string;
+  plantillaNombre?: string;
+  plantillaGuid?: string;
+  idHvRefArchivo?: number;
+  plantillaFile?: File | null;
 };
 
 const DEFAULT_DECLARACIONES: DeclaracionItem[] = [
   {
     id: 'declaracion-1',
+    idDeclaracionTipo: 1,
     titulo: 'Declaracion Jurada 1',
-    contenido:
-      '<p>Yo {{nombre}} {{apellidos}} declaro bajo juramento que la informacion consignada es veridica y comprobable.</p>' +
-      '<p>Respecto a la convocatoria {{convocatoria}} del anio {{anio}}, oficina zonal {{oficina zonal}} y oficina de coordinacion {{oficinaCoordinacion}}, me comprometo a notificar cualquier cambio relevante en los datos proporcionados.</p>',
+    descripcion: 'Plantilla general para declaraciones juradas.',
+    plantillaNombre: '',
   },
   {
     id: 'declaracion-2',
+    idDeclaracionTipo: 2,
     titulo: 'Declaracion Jurada 2',
-    contenido:
-      '<p>Yo {{nombre}} {{apellidos}} declaro no tener impedimento legal ni administrativo para participar en la convocatoria {{convocatoria}} de la oficina zonal {{oficina zonal}}.</p>' +
-      '<p>Autorizo la verificacion de la informacion brindada en cualquier etapa del proceso {{anio}} en la oficina de coordinacion {{oficinaCoordinacion}}.</p>',
+    descripcion: 'Plantilla para validacion de datos del postulante.',
+    plantillaNombre: '',
   },
   {
     id: 'declaracion-3',
+    idDeclaracionTipo: 3,
     titulo: 'Declaracion Jurada 3',
-    contenido:
-      '<p>Yo {{nombre}} {{apellidos}} declaro conocer las bases y condiciones de la convocatoria {{convocatoria}}, y acepto sus terminos.</p>' +
-      '<p>Me responsabilizo por la documentacion presentada a la fecha {{fecha}} para la oficina zonal {{oficina zonal}}.</p>',
+    descripcion: 'Plantilla de conformidad y compromiso.',
+    plantillaNombre: '',
   },
 ];
 
 const buildNewDeclaracion = (index: number): DeclaracionItem => ({
   id: `declaracion-${index}-${Date.now()}`,
+  idDeclaracionTipo: 0,
   titulo: `Declaracion Jurada ${index}`,
-  contenido:
-    '<p>Yo {{nombre}} {{apellidos}} declaro bajo juramento que...</p>' +
-    '<p>Convocatoria: {{convocatoria}} - Anio {{anio}} - Oficina zonal {{oficina zonal}} - Oficina de coordinacion {{oficinaCoordinacion}}.</p>',
+  descripcion: 'Plantilla para declaraciones juradas.',
+  plantillaNombre: '',
 });
 
-export function DeclaracionesJuradasAdmin() {
+type DeclaracionesJuradasAdminProps = {
+  adminUserId?: number;
+};
+
+const pickLatestArchivo = (items: HvRefArchivo[]) => {
+  if (!items || items.length === 0) return null;
+  let best = items[0];
+  let bestId = Number(best.idHvRefArchivo || 0);
+  for (const item of items) {
+    const id = Number(item.idHvRefArchivo || 0);
+    if (id > bestId) {
+      best = item;
+      bestId = id;
+    }
+  }
+  return best;
+};
+
+const mapDeclaracionTipos = (items: DeclaracionTipo[]): DeclaracionItem[] => {
+  if (!items || items.length === 0) return DEFAULT_DECLARACIONES;
+  return items.map((item, index) => ({
+    id: String(item.idDeclaracionTipo ?? index),
+    idDeclaracionTipo: item.idDeclaracionTipo,
+    titulo: item.nombre || `Declaracion Jurada ${index + 1}`,
+    descripcion: item.descripcion || '',
+    plantillaNombre: '',
+    plantillaGuid: '',
+    idHvRefArchivo: 0,
+  }));
+};
+
+export function DeclaracionesJuradasAdmin({ adminUserId = 0 }: DeclaracionesJuradasAdminProps) {
   const [declaraciones, setDeclaraciones] = useState<DeclaracionItem[]>(DEFAULT_DECLARACIONES);
   const [selectedId, setSelectedId] = useState<string>(DEFAULT_DECLARACIONES[0].id);
-  const selected = declaraciones.find((item) => item.id === selectedId) ?? declaraciones[0];
+  const selected = useMemo(
+    () => declaraciones.find((item) => item.id === selectedId) ?? declaraciones[0],
+    [declaraciones, selectedId],
+  );
   const [editedTitulo, setEditedTitulo] = useState(selected.titulo);
-  const [editedContenido, setEditedContenido] = useState(selected.contenido);
-  const [showPreview, setShowPreview] = useState(false);
+  const [editedDescripcion, setEditedDescripcion] = useState(selected.descripcion);
+  const [editedPlantilla, setEditedPlantilla] = useState<File | null>(selected.plantillaFile ?? null);
+  const [editedPlantillaNombre, setEditedPlantillaNombre] = useState<string>(selected.plantillaNombre ?? '');
   const [isSaving, setIsSaving] = useState(false);
-  const [editorKey, setEditorKey] = useState(0);
-  const editorRef = useRef<HTMLDivElement | null>(null);
-  const previewVariableMap: Record<string, string> = {
-    nombre: 'Juan',
-    apellidos: 'Perez',
-    convocatoria: 'Servicio Extensionista - Lima Norte 2026',
-    anio: '2026',
-    ano: '2026',
-    fecha: '16/02/2026',
-    documento: 'DNI 12345678',
-    perfil: 'Extensionista',
-    'oficina zonal': 'Lima',
-    oficina_zonal: 'Lima',
-    oficinazonal: 'Lima',
-    'oficina coordinacion': 'Lima Norte',
-    oficina_coordinacion: 'Lima Norte',
-    oficinacoordinacion: 'Lima Norte',
-  };
+  const [isLoading, setIsLoading] = useState(false);
 
-  const applyVariables = (text: string) =>
-    text.replace(/{{\s*([^}]+?)\s*}}/g, (match, rawKey) => {
-      const key = String(rawKey || '').trim().toLowerCase();
-      return previewVariableMap[key] ?? match;
-    });
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setIsLoading(true);
+      const baseItems = DEFAULT_DECLARACIONES;
 
-  const setEditorContent = (html: string) => {
-    setEditedContenido(html);
-    setEditorKey((prev) => prev + 1);
-  };
+      const enriched = await Promise.all(
+        baseItems.map(async (item) => {
+          if (!item.idDeclaracionTipo) return item;
+          try {
+            const archivos = await fetchHvRefArchivo('DECL_TIPO', item.idDeclaracionTipo);
+            const latest = pickLatestArchivo(archivos);
+            return {
+              ...item,
+              plantillaNombre: latest?.nombreOrig || latest?.nombreOriginal || '',
+              plantillaGuid: latest?.guid || '',
+              idHvRefArchivo: latest?.idHvRefArchivo || 0,
+            };
+          } catch {
+            return item;
+          }
+        }),
+      );
 
-  const handleCommand = (command: string) => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
-    document.execCommand(command, false);
-    setEditedContenido(editorRef.current.innerHTML);
-  };
+      if (active) {
+        setDeclaraciones(enriched);
+        setSelectedId(enriched[0]?.id || DEFAULT_DECLARACIONES[0].id);
+        setIsLoading(false);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    setEditedTitulo(selected.titulo);
+    setEditedDescripcion(selected.descripcion);
+    setEditedPlantilla(selected.plantillaFile ?? null);
+    setEditedPlantillaNombre(selected.plantillaNombre ?? '');
+  }, [selectedId, selected?.titulo, selected?.descripcion, selected?.plantillaNombre]);
 
   const handleSelect = (id: string) => {
     const current = declaraciones.find((item) => item.id === id);
     if (!current) return;
     setSelectedId(id);
     setEditedTitulo(current.titulo);
-    setEditorContent(current.contenido);
-    setShowPreview(false);
+    setEditedDescripcion(current.descripcion);
+    setEditedPlantilla(current.plantillaFile ?? null);
+    setEditedPlantillaNombre(current.plantillaNombre ?? '');
   };
 
-  const handleGuardar = () => {
+  const handleGuardar = async () => {
     if (isSaving) return;
+    if (!selected) return;
+    if (!selected.idDeclaracionTipo) {
+      toast.error('No se puede guardar un nuevo espacio hasta registrarlo en la base de datos.');
+      return;
+    }
     setIsSaving(true);
-    setDeclaraciones((prev) =>
-      prev.map((item) =>
-        item.id === selectedId
-          ? { ...item, titulo: editedTitulo, contenido: editedContenido }
-          : item,
-      ),
-    );
-    toast.success('Declaracion guardada exitosamente');
-    setIsSaving(false);
+    try {
+      if (!adminUserId) {
+        toast.error('No se pudo identificar al usuario administrador.');
+        return;
+      }
+
+      if (editedPlantilla) {
+        const extension = editedPlantilla.name.split('.').pop() || '';
+        await saveHvRefArchivo(editedPlantilla, {
+          idHvRefArchivo: Number(selected.idHvRefArchivo || 0),
+          idHojaVida: 0,
+          entidad: 'DECL_TIPO',
+          idEntidad: selected.idDeclaracionTipo,
+          tipoArchivo: 'DECL_TIPO',
+          nombreOrig: editedPlantilla.name,
+          ext: extension,
+          mime: editedPlantilla.type || 'application/octet-stream',
+          sizeBytes: editedPlantilla.size,
+          ruta: 'hv',
+          usuarioAccion: adminUserId,
+        });
+      }
+
+      let plantillaNombre = editedPlantillaNombre;
+      let plantillaGuid = selected.plantillaGuid;
+      let idHvRefArchivo = selected.idHvRefArchivo;
+      try {
+        const archivos = await fetchHvRefArchivo('DECL_TIPO', selected.idDeclaracionTipo);
+        const latest = pickLatestArchivo(archivos);
+        plantillaNombre = latest?.nombreOrig || latest?.nombreOriginal || plantillaNombre;
+        plantillaGuid = latest?.guid || plantillaGuid;
+        idHvRefArchivo = latest?.idHvRefArchivo || idHvRefArchivo;
+      } catch {
+        // ignore
+      }
+
+      setDeclaraciones((prev) =>
+        prev.map((item) =>
+          item.id === selectedId
+            ? {
+                ...item,
+                titulo: editedTitulo,
+                descripcion: editedDescripcion,
+                plantillaFile: editedPlantilla,
+                plantillaNombre,
+                plantillaGuid,
+                idHvRefArchivo,
+              }
+            : item,
+        ),
+      );
+      toast.success('Declaracion guardada exitosamente');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleRestaurar = () => {
@@ -116,7 +219,9 @@ export function DeclaracionesJuradasAdmin() {
       const current = declaraciones.find((item) => item.id === selectedId);
       if (!current) return;
       setEditedTitulo(current.titulo);
-      setEditorContent(current.contenido);
+      setEditedDescripcion(current.descripcion);
+      setEditedPlantilla(current.plantillaFile ?? null);
+      setEditedPlantillaNombre(current.plantillaNombre ?? '');
     }
   };
 
@@ -126,8 +231,9 @@ export function DeclaracionesJuradasAdmin() {
     setDeclaraciones((prev) => [...prev, nueva]);
     setSelectedId(nueva.id);
     setEditedTitulo(nueva.titulo);
-    setEditorContent(nueva.contenido);
-    setShowPreview(false);
+    setEditedDescripcion(nueva.descripcion);
+    setEditedPlantilla(null);
+    setEditedPlantillaNombre('');
   };
 
   return (
@@ -139,7 +245,7 @@ export function DeclaracionesJuradasAdmin() {
             Declaraciones Juradas
           </h1>
           <p className="mt-2 font-bold" style={{ color: '#108cc9' }}>
-            Configurar declaraciones juradas para postulantes
+            Configurar plantillas Word para declaraciones juradas
           </p>
         </div>
         <Button onClick={handleAgregar} className="bg-green-600 hover:bg-green-700 gap-2">
@@ -162,7 +268,7 @@ export function DeclaracionesJuradasAdmin() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-bold mb-4" style={{ color: '#04a25c' }}>
-                  Editor de Declaracion
+                  Plantilla de Declaracion
                 </h3>
               </div>
 
@@ -180,54 +286,61 @@ export function DeclaracionesJuradasAdmin() {
 
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">
-                  Contenido
+                  Descripcion
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => handleCommand('bold')}>
-                    Negrita
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => handleCommand('italic')}>
-                    Cursiva
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => handleCommand('underline')}>
-                    Subrayado
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => handleCommand('insertUnorderedList')}>
-                    Lista
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => handleCommand('insertOrderedList')}>
-                    Lista numerada
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => handleCommand('removeFormat')}>
-                    Limpiar formato
-                  </Button>
-                </div>
-                <div
-                  key={editorKey}
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={(event) => {
-                    const html = event.currentTarget.innerHTML;
-                    setEditedContenido(html);
-                  }}
-                  className="w-full min-h-[320px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
-                  dangerouslySetInnerHTML={{ __html: editedContenido }}
+                <textarea
+                  rows={3}
+                  value={editedDescripcion}
+                  onChange={(e) => setEditedDescripcion(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
                 />
               </div>
 
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Plantilla Word
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    id={`plantilla-${selectedId}`}
+                    accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      setEditedPlantilla(file);
+                      setEditedPlantillaNombre(file?.name ?? '');
+                    }}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor={`plantilla-${selectedId}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Cargar Word
+                  </label>
+                  {editedPlantillaNombre ? (
+                    <span className="text-sm text-gray-600 truncate">{editedPlantillaNombre}</span>
+                  ) : (
+                    <span className="text-sm text-gray-400">Sin archivo</span>
+                  )}
+                </div>
+              </div>
+
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs font-semibold text-blue-900 mb-2">Variables disponibles:</p>
+                <p className="text-xs font-semibold text-blue-900 mb-2">Variables disponibles (usar llaves):</p>
                 <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
-                  <div>• {'{'}{'nombre'}{'}'} - Nombre del postulante</div>
-                  <div>• {'{'}{'apellidos'}{'}'} - Apellidos del postulante</div>
-                  <div>• {'{'}{'convocatoria'}{'}'} - Nombre de la convocatoria</div>
-                  <div>• {'{'}{'anio'}{'}'} - Anio de la convocatoria</div>
-                  <div>• {'{'}{'fecha'}{'}'} - Fecha actual</div>
-                  <div>• {'{'}{'documento'}{'}'} - Documento del postulante</div>
-                  <div>• {'{'}{'perfil'}{'}'} - Perfil o cargo</div>
-                  <div>• {'{'}{'oficina zonal'}{'}'} - Oficina zonal</div>
-                  <div>• {'{'}{'oficinaCoordinacion'}{'}'} - Oficina de coordinacion</div>
+                  <div>- {'{'}nombre{'}'} - Nombres del postulante</div>
+                  <div>- {'{'}apellidos{'}'} - Apellidos del postulante</div>
+                  <div>- {'{'}apellido paterno{'}'} - Apellido paterno</div>
+                  <div>- {'{'}apellido materno{'}'} - Apellido materno</div>
+                  <div>- {'{'}documento{'}'} - Numero de documento</div>
+                  <div>- {'{'}correo{'}'} - Correo electronico</div>
+                  <div>- {'{'}ruc{'}'} - RUC</div>
+                  <div>- {'{'}direccion{'}'} - Direccion</div>
+                  <div>- {'{'}telefono{'}'} - Telefono / celular</div>
+                  <div>- {'{'}fecha{'}'} - Fecha actual</div>
+                  <div>- {'{'}anio{'}'} - Ano actual</div>
                 </div>
               </div>
 
@@ -248,50 +361,33 @@ export function DeclaracionesJuradasAdmin() {
                   <RotateCcw className="w-4 h-4" />
                   Restaurar Defecto
                 </Button>
-                <Button
-                  onClick={() => setShowPreview(!showPreview)}
-                  variant="outline"
-                  className="gap-2 ml-auto"
-                >
-                  <Eye className="w-4 h-4" />
-                  {showPreview ? 'Ocultar' : 'Ver'} Vista Previa
-                </Button>
               </div>
             </div>
           </Card>
 
           <Card className="p-6">
             <h3 className="text-lg font-bold mb-4" style={{ color: '#04a25c' }}>
-              Vista Previa
+              Estado de la Plantilla
             </h3>
-
-            {showPreview ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Titulo:</p>
-                  <p className="font-semibold text-gray-900">{applyVariables(editedTitulo)}</p>
-                </div>
-
-                <div className="p-4 bg-white rounded-lg border border-gray-200 min-h-[400px]">
-                  <div
-                    className="whitespace-pre-wrap font-sans text-sm text-gray-800"
-                    dangerouslySetInnerHTML={{ __html: applyVariables(editedContenido) }}
-                  />
-                </div>
-
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-xs text-amber-800">
-                    <strong>Nota:</strong> Esta es una vista previa. El texto se mostrara al
-                    postulante tal como lo configures aqui.
-                  </p>
-                </div>
+            <div className="space-y-4">
+              {isLoading && (
+                <div className="text-sm text-gray-500">Cargando plantillas...</div>
+              )}
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Titulo:</p>
+                <p className="font-semibold text-gray-900">{editedTitulo}</p>
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-[400px] text-gray-400">
-                <Eye className="w-16 h-16 mb-4" />
-                <p className="text-sm">Haz clic en "Ver Vista Previa" para visualizar</p>
+              <div className="p-4 bg-white rounded-lg border border-gray-200">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Descripcion:</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{editedDescripcion}</p>
               </div>
-            )}
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-800">
+                  <strong>Nota:</strong> Esta pantalla solo configura la plantilla. El usuario cargara el Word
+                  con variables y el sistema completara los datos automaticamente.
+                </p>
+              </div>
+            </div>
           </Card>
         </div>
       </Tabs>

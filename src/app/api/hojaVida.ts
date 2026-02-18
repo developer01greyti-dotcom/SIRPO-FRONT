@@ -360,6 +360,23 @@ export const downloadHojaVidaPdf = async (idHojaVida: number): Promise<Blob> => 
   return response.data as Blob;
 };
 
+
+export const downloadDeclaracionesPdf = async (
+  idHojaVida: number,
+): Promise<{ blob: Blob; contentType: string }> => {
+  const response = await apiClient.get('/hv_decl_pdf', {
+    params: { idHojaVida, _ts: Date.now() },
+    responseType: 'blob',
+    headers: {
+      Accept: 'application/pdf',
+      'Cache-Control': 'no-cache',
+    },
+  });
+  const contentType = String(response.headers?.['content-type'] || '');
+  return { blob: response.data as Blob, contentType };
+};
+
+
 export const fetchHvExpList = async (
   idHojaVida: number,
 ): Promise<any[]> => {
@@ -526,6 +543,26 @@ export const deleteHvForm = async (
 ): Promise<boolean> => {
   const response = await apiClient.delete<boolean>('/hv_form', {
     data: { estructura: { idHvFormacion, usuarioAccion } },
+  });
+  return Boolean(response.data);
+};
+
+export const deleteHvCur = async (
+  idHvCurso: number,
+  usuarioAccion: number,
+): Promise<boolean> => {
+  const response = await apiClient.delete<boolean>('/hv_cur', {
+    data: { estructura: { idHvCurso, usuarioAccion } },
+  });
+  return Boolean(response.data);
+};
+
+export const deleteHvExp = async (
+  idHvExperiencia: number,
+  usuarioAccion: number,
+): Promise<boolean> => {
+  const response = await apiClient.delete<boolean>('/hv_exp', {
+    data: { estructura: { idHvExperiencia, usuarioAccion } },
   });
   return Boolean(response.data);
 };

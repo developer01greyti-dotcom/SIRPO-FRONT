@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { PdfViewer } from '../PdfViewer';
-import { fetchHojaVidaActual, fetchHojaVidaDatos, fetchHvExpList } from '../../api/hojaVida';
+import { fetchHojaVidaActual, fetchHojaVidaDatos, fetchHvExpList, deleteHvExp } from '../../api/hojaVida';
 import type { LoginResponse } from '../../api/auth';
 
 interface Experiencia {
@@ -169,9 +169,34 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     setDialogEliminar(true);
   };
 
-  const confirmarEliminar = () => {
-    if (experienciaToDelete) {
-      setExperiencias(experiencias.filter((e) => e.id !== experienciaToDelete));
+  const confirmarEliminar = async () => {
+    if (!experienciaToDelete) {
+      setDialogEliminar(false);
+      return;
+    }
+    if (!user?.idUsuario) {
+      setLoadError('No se pudo eliminar la experiencia profesional.');
+      setDialogEliminar(false);
+      setExperienciaToDelete(null);
+      return;
+    }
+    const idHvExperiencia = Number(experienciaToDelete || 0);
+    if (!idHvExperiencia) {
+      setLoadError('No se pudo eliminar la experiencia profesional.');
+      setDialogEliminar(false);
+      setExperienciaToDelete(null);
+      return;
+    }
+    try {
+      const ok = await deleteHvExp(idHvExperiencia, user.idUsuario);
+      if (ok) {
+        setRefreshKey((prev) => prev + 1);
+      } else {
+        setLoadError('No se pudo eliminar la experiencia profesional.');
+      }
+    } catch (error) {
+      setLoadError('No se pudo eliminar la experiencia profesional.');
+    } finally {
       setDialogEliminar(false);
       setExperienciaToDelete(null);
     }

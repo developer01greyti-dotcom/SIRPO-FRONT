@@ -23,6 +23,7 @@ import {
   fetchHojaVidaActual,
   fetchHvCurList,
   fetchHvFormList,
+  deleteHvCur,
   deleteHvForm,
 } from '../../api/hojaVida';
 
@@ -261,9 +262,28 @@ export function FormacionAcademica({ user }: FormacionAcademicaProps) {
     setVistaActual('curso-form');
   };
 
-  const handleEliminarCurso = (id: string) => {
-    if (window.confirm('Está seguro que desea eliminar este curso?')) {
-      setCursos(cursos.filter(c => c.id !== id));
+  const handleEliminarCurso = async (curso: Curso) => {
+    if (!user?.idUsuario) {
+      setLoadError('No se pudo eliminar el curso.');
+      return;
+    }
+    if (!window.confirm('?Est? seguro que desea eliminar este curso?')) {
+      return;
+    }
+    const idHvCurso = Number(curso.idHvCurso || curso.id || 0);
+    if (!idHvCurso) {
+      setLoadError('No se pudo eliminar el curso.');
+      return;
+    }
+    try {
+      const ok = await deleteHvCur(idHvCurso, user.idUsuario);
+      if (ok) {
+        setRefreshKey((prev) => prev + 1);
+      } else {
+        setLoadError('No se pudo eliminar el curso.');
+      }
+    } catch (error) {
+      setLoadError('No se pudo eliminar el curso.');
     }
   };
 
@@ -507,7 +527,7 @@ export function FormacionAcademica({ user }: FormacionAcademicaProps) {
                               <Edit2 className="w-4 h-4 mr-2" />
                               Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEliminarCurso(curso.id)} className="text-red-600">
+                            <DropdownMenuItem onClick={() => handleEliminarCurso(curso)} className="text-red-600">
                               <Trash2 className="w-4 h-4 mr-2" />
                               Eliminar
                             </DropdownMenuItem>
