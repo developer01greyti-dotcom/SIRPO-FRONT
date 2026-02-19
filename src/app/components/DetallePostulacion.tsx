@@ -54,11 +54,20 @@ interface Experiencia {
   certificadoPreview?: string;
 }
 
+interface Declaracion {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  archivoAdjunto: { file: File; preview: string } | null;
+  archivoGuid?: string;
+}
+
 interface DetallePostulacionProps {
   postulacion: Postulacion;
   formaciones: Formacion[];
   cursos: Curso[];
   experiencias: Experiencia[];
+  declaraciones?: Declaracion[];
   onClose: () => void;
 }
 
@@ -67,6 +76,7 @@ export function DetallePostulacion({
   formaciones,
   cursos,
   experiencias,
+  declaraciones = [],
   onClose,
 }: DetallePostulacionProps) {
   const normalizeEstado = (estado: string) => {
@@ -226,7 +236,7 @@ export function DetallePostulacion({
           formaciones={formaciones}
           cursos={cursos}
           experiencias={experiencias}
-          declaraciones={[]}
+          declaraciones={declaraciones}
           hideHeader={true}
         />
       </div>

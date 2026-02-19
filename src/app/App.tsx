@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import { Sidebar } from './components/Sidebar';
+import { GlobalLoading } from './components/GlobalLoading';
 import { FilterCard } from './components/FilterCard';
 import { ConvocatoriasTable } from './components/ConvocatoriasTable';
 import { PostularModal } from './components/PostularModal';
@@ -50,6 +51,8 @@ interface Convocatoria {
   pdfUrl: string;
   archivoGuid?: string;
   estadoId?: number;
+  conocimientos?: string[];
+  conocimientosIds?: number[];
 }
 
 // Interfaces para Hoja de Vida
@@ -295,6 +298,7 @@ export default function App() {
     : 'login';
   const storedAuth = loadStoredAuthState();
   const toaster = <Toaster position="top-right" richColors />;
+  const globalLoading = <GlobalLoading />;
   // Estado para definir si es usuario normal o admin
   const [userType, setUserType] = useState<'postulante' | 'admin' | null>(
     storedAuth.userType ?? initialUserType,
@@ -672,6 +676,36 @@ export default function App() {
     return value as Convocatoria['estado'];
   };
 
+  const parseConocimientos = (raw: any): string[] => {
+    if (Array.isArray(raw)) {
+      return raw
+        .map((item) => String(item || '').trim())
+        .filter(Boolean);
+    }
+    if (typeof raw === 'string') {
+      return raw
+        .split(/[\n,;|]/g)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+    return [];
+  };
+
+  const parseConocimientoIds = (raw: any): number[] => {
+    if (Array.isArray(raw)) {
+      return raw
+        .map((item) => Number(item))
+        .filter((item) => Number.isFinite(item) && item > 0);
+    }
+    if (typeof raw === 'string') {
+      return raw
+        .split(',')
+        .map((item) => Number(item.trim()))
+        .filter((item) => Number.isFinite(item) && item > 0);
+    }
+    return [];
+  };
+
   const mapConvocatoria = (item: any): Convocatoria => ({
     id: String(item.idConvocatoria ?? item.id ?? ''),
     nombre: item.nombre ?? '',
@@ -691,6 +725,8 @@ export default function App() {
     pdfUrl: item.pdfUrl ?? '',
     archivoGuid: item.archivoGuid ?? '',
     estadoId: item.estadoId !== undefined && item.estadoId !== null ? Number(item.estadoId) : undefined,
+    conocimientos: parseConocimientos(item.conocimientos ?? item.clob3 ?? item.clob_3 ?? ''),
+    conocimientosIds: parseConocimientoIds(item.conocimientosIds ?? item.conocimientos_ids ?? ''),
   });
 
   const loadConvocatorias = async (filters: any = {}) => {
@@ -924,6 +960,7 @@ export default function App() {
       return (
         <>
           {toaster}
+          {globalLoading}
           <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
             <Card className="w-full max-w-2xl p-8 shadow-xl">
               <div className="text-center mb-3">
@@ -983,6 +1020,7 @@ export default function App() {
       return (
         <>
           {toaster}
+          {globalLoading}
           <AdminLogin
             onLogin={(role, username, adminId, token, oficinaZonalId, oficinaZonal) => {
               handleAdminLogin(role, username, adminId, oficinaZonalId, oficinaZonal, token);
@@ -997,6 +1035,7 @@ export default function App() {
       return (
         <>
           {toaster}
+          {globalLoading}
           <RegisterForm
             onRegister={handleRegister}
             onNavigateToLogin={() => navigate('/login')}
@@ -1009,6 +1048,7 @@ export default function App() {
       return (
         <>
           {toaster}
+          {globalLoading}
           <RecoveryForm onNavigateToLogin={() => navigate('/login')} />
         </>
       );
@@ -1017,6 +1057,7 @@ export default function App() {
     return (
       <>
         {toaster}
+        {globalLoading}
         <LoginForm
           onLogin={handleLogin}
           onNavigateToRegister={() => navigate('/registroUsuario')}
@@ -1031,6 +1072,7 @@ export default function App() {
     return (
       <>
         {toaster}
+        {globalLoading}
         <div className="min-h-screen bg-gray-50">
         <AdminSidebar 
           activeSection={adminSection} 
@@ -1078,6 +1120,7 @@ export default function App() {
   return (
     <>
       {toaster}
+      {globalLoading}
       <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
       <Sidebar 

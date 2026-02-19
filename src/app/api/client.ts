@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { toast } from 'sonner';
+import { beginGlobalLoading, endGlobalLoading } from '../utils/loadingTracker';
 
 const baseURL =
   (import.meta as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ||
@@ -164,3 +165,29 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+const attachGlobalLoading = (client: typeof apiClient) => {
+  client.interceptors.request.use(
+    (config) => {
+      beginGlobalLoading();
+      return config;
+    },
+    (error) => {
+      endGlobalLoading();
+      return Promise.reject(error);
+    },
+  );
+  client.interceptors.response.use(
+    (response) => {
+      endGlobalLoading();
+      return response;
+    },
+    (error) => {
+      endGlobalLoading();
+      return Promise.reject(error);
+    },
+  );
+};
+
+attachGlobalLoading(apiClient);
+attachGlobalLoading(publicApiClient);

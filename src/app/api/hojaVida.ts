@@ -363,9 +363,66 @@ export const downloadHojaVidaPdf = async (idHojaVida: number): Promise<Blob> => 
 
 export const downloadDeclaracionesPdf = async (
   idHojaVida: number,
+  options?: {
+    idConvocatoria?: number;
+    idPersona?: number;
+    oficinaZonal?: string;
+    oficinaCoordinacion?: string;
+    distrito?: string;
+    provincia?: string;
+    departamento?: string;
+    idUbigeo?: string | number;
+    correo2?: string;
+    familiares?: Array<{
+      apellidos: string;
+      nombres: string;
+      relacion: string;
+      unidad: string;
+    }>;
+  },
 ): Promise<{ blob: Blob; contentType: string }> => {
+  const params: Record<string, any> = { idHojaVida, _ts: Date.now() };
+  if (options?.idConvocatoria) {
+    params.idConvocatoria = options.idConvocatoria;
+  }
+  if (options?.idPersona) {
+    params.idPersona = options.idPersona;
+  }
+  if (options?.oficinaZonal) {
+    params.oficinaZonal = options.oficinaZonal;
+  }
+  if (options?.oficinaCoordinacion) {
+    params.oficinaCoordinacion = options.oficinaCoordinacion;
+  }
+  if (options?.distrito) {
+    params.distrito = options.distrito;
+  }
+  if (options?.provincia) {
+    params.provincia = options.provincia;
+  }
+  if (options?.departamento) {
+    params.departamento = options.departamento;
+  }
+  if (options?.idUbigeo) {
+    params.idUbigeo = options.idUbigeo;
+  }
+  if (options?.correo2) {
+    params.correo2 = options.correo2;
+  }
+  if (options?.familiares?.length) {
+    const max = Math.min(options.familiares.length, 3);
+    for (let i = 0; i < max; i += 1) {
+      const familiar = options.familiares[i];
+      const index = i + 1;
+      params[`familiar${index}Apellidos`] = familiar.apellidos;
+      params[`familiar${index}Nombres`] = familiar.nombres;
+      params[`familiar${index}Relacion`] = familiar.relacion;
+      params[`familiar${index}Unidad`] = familiar.unidad;
+    }
+  }
+
   const response = await apiClient.get('/hv_decl_pdf', {
-    params: { idHojaVida, _ts: Date.now() },
+    params,
     responseType: 'blob',
     headers: {
       Accept: 'application/pdf',

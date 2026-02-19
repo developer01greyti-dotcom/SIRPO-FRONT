@@ -28,6 +28,8 @@ export interface ConvocatoriaListItem {
   numeroVacantes?: number;
   requisitosMinimos?: string;
   funcionesPrincipales?: string;
+  conocimientos?: string[];
+  conocimientosIds?: number[];
   salarioMin?: number;
   salarioMax?: number;
   archivoGuid?: string;
@@ -48,6 +50,36 @@ export interface ConvocatoriaUpsertPayload {
   idArchivoBases: number;
   usuarioAccion: number;
 }
+
+const parseConocimientos = (raw: any): string[] => {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split(/[\n,;|]/g)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const parseConocimientoIds = (raw: any): number[] => {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item) && item > 0);
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split(',')
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isFinite(item) && item > 0);
+  }
+  return [];
+};
 
 export const fetchConvocatoriasList = async (
   filters: ConvocatoriaListFilters = {},
@@ -86,6 +118,8 @@ export const fetchConvocatoriasList = async (
     numeroVacantes: item.numeroVacantes ?? 0,
     requisitosMinimos: item.requisitosMinimos ?? item.clob1 ?? '',
     funcionesPrincipales: item.funcionesPrincipales ?? item.clob2 ?? '',
+    conocimientos: parseConocimientos(item.conocimientos ?? item.clob3 ?? item.clob_3 ?? ''),
+    conocimientosIds: parseConocimientoIds(item.conocimientosIds ?? item.conocimientos_ids ?? ''),
     salarioMin: item.salarioMin ?? 0,
     salarioMax: item.salarioMax ?? 0,
     archivoGuid: item.archivoGuid ?? '',

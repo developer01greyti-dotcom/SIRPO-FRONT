@@ -5,6 +5,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import type { DeclaracionTipo } from '../../api/declaraciones';
+import { fetchDeclaracionTipos, updateDeclaracionTipo } from '../../api/declaraciones';
 import { fetchHvRefArchivo, saveHvRefArchivo, type HvRefArchivo } from '../../api/hvRefArchivo';
 
 type DeclaracionItem = {
@@ -99,7 +100,16 @@ export function DeclaracionesJuradasAdmin({ adminUserId = 0 }: DeclaracionesJura
     let active = true;
     const load = async () => {
       setIsLoading(true);
-      const baseItems = DEFAULT_DECLARACIONES;
+      let baseItems = DEFAULT_DECLARACIONES;
+      try {
+        const tipos = await fetchDeclaracionTipos();
+        const mapped = mapDeclaracionTipos(tipos);
+        if (mapped.length > 0) {
+          baseItems = mapped;
+        }
+      } catch {
+        baseItems = DEFAULT_DECLARACIONES;
+      }
 
       const enriched = await Promise.all(
         baseItems.map(async (item) => {
@@ -160,6 +170,17 @@ export function DeclaracionesJuradasAdmin({ adminUserId = 0 }: DeclaracionesJura
     try {
       if (!adminUserId) {
         toast.error('No se pudo identificar al usuario administrador.');
+        return;
+      }
+
+      const updated = await updateDeclaracionTipo({
+        idDeclaracionTipo: selected.idDeclaracionTipo,
+        nombre: editedTitulo,
+        descripcion: editedDescripcion,
+        usuarioAccion: adminUserId,
+      });
+      if (!updated) {
+        toast.error('No se pudo guardar el titulo y descripcion.');
         return;
       }
 
@@ -383,8 +404,8 @@ export function DeclaracionesJuradasAdmin({ adminUserId = 0 }: DeclaracionesJura
               </div>
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-xs text-amber-800">
-                  <strong>Nota:</strong> Esta pantalla solo configura la plantilla. El usuario cargara el Word
-                  con variables y el sistema completara los datos automaticamente.
+                  <strong>Nota:</strong> Esta pantalla guarda el titulo, la descripcion y la plantilla Word.
+                  El usuario cargara el Word con variables y el sistema completara los datos automaticamente.
                 </p>
               </div>
             </div>

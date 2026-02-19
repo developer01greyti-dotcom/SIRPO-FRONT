@@ -1,9 +1,17 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useEffect, useState, type CSSProperties } from 'react';
 import { X, Save, Upload, FileText } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { 
   fetchOficinaCoordinacionList, 
   fetchEstadoConvocatoriaDropdown,
@@ -13,6 +21,12 @@ import {
   type OficinaZonalCoordinacionItem, 
 } from '../../api/catalogos'; 
 import { upsertConvocatoria, type ConvocatoriaUpsertPayload } from '../../api/convocatorias';
+import {
+  fetchConocimientosDropdown,
+  upsertConocimiento,
+  type ConocimientoItem,
+} from '../../api/conocimientos';
+import { setConvocatoriaConocimientos } from '../../api/convocatoriaConocimientos';
 import { saveHvRefArchivo } from '../../api/hvRefArchivo';
 import { type AdminRole } from '../../utils/roles';
 
@@ -35,6 +49,8 @@ interface Convocatoria {
   numeroVacantes?: number;
   requisitosMinimos?: string;
   funcionesPrincipales?: string;
+  conocimientos?: string[] | string;
+  conocimientosIds?: number[] | string;
   salarioMin?: number;
   salarioMax?: number;
   estado?: string;
@@ -50,6 +66,32 @@ interface ConvocatoriaFormProps {
   onGuardar: () => void;
   onCancelar: () => void;
 }
+
+const normalizeConocimientos = (raw: string[] | string | undefined): string[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+  return raw
+    .split(/[\n,;|]/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const parseConocimientoIds = (raw: number[] | string | undefined): number[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item) && item > 0);
+  }
+  return raw
+    .split(',')
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isFinite(item) && item > 0);
+};
 
 export function ConvocatoriaForm({
   convocatoria,
@@ -69,10 +111,25 @@ export function ConvocatoriaForm({
           requisitos: 'Requisitos mínimos',
           funciones: 'Funciones principales',
         };
+  const initialConocimientoIds = parseConocimientoIds(convocatoria?.conocimientosIds);
+  const initialConocimientoNames = normalizeConocimientos(convocatoria?.conocimientos);
   const [perfilOptions, setPerfilOptions] = useState<DropdownItem[]>([]);
   const [tipoContratoOptions, setTipoContratoOptions] = useState<DropdownItem[]>([]);
   const [estadoOptions, setEstadoOptions] = useState<DropdownItem[]>([]);
   const [oficinaOptions, setOficinaOptions] = useState<OficinaZonalCoordinacionItem[]>([]);
+  const [conocimientoOptions, setConocimientoOptions] = useState<ConocimientoItem[]>([]);
+  const [conocimientoQuery, setConocimientoQuery] = useState('');
+  const [isConocimientoModalOpen, setIsConocimientoModalOpen] = useState(false);
+  const [nuevoConocimientoNombre, setNuevoConocimientoNombre] = useState('');
+  const [nuevoConocimientoEstado, setNuevoConocimientoEstado] = useState<'ACTIVO' | 'INACTIVO'>(
+    'ACTIVO',
+  );
+  const [conocimientoError, setConocimientoError] = useState('');
+  const [isConocimientoSaving, setIsConocimientoSaving] = useState(false);
+  const [pendingConocimientoNames, setPendingConocimientoNames] = useState<string[]>(
+    initialConocimientoIds.length ? [] : initialConocimientoNames,
+  );
+  const [isConocimientoLoading, setIsConocimientoLoading] = useState(false);
   const [oficinaQuery, setOficinaQuery] = useState('');
   const [isOficinaLoading, setIsOficinaLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -135,6 +192,7 @@ export function ConvocatoriaForm({
     fechaFin: convocatoria ? toInputDate(convocatoria?.fechaFin) : getDefaultDates().fechaFin, 
     requisitosMinimos: convocatoria?.requisitosMinimos || '',
     funcionesPrincipales: convocatoria?.funcionesPrincipales || '',
+    conocimientoIds: initialConocimientoIds,
     salarioMin: convocatoria?.salarioMin ? String(convocatoria.salarioMin) : '',
     salarioMax: convocatoria?.salarioMax ? String(convocatoria.salarioMax) : '',
     estado: convocatoria?.estadoId ? String(convocatoria.estadoId) : convocatoria?.estado || '',
@@ -145,6 +203,30 @@ export function ConvocatoriaForm({
   });
 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+
+  const trimmedConocimientoQuery = conocimientoQuery.trim();
+  const isConocimientoFilterActive = trimmedConocimientoQuery.length >= 3;
+  const filteredConocimientos = isConocimientoFilterActive
+    ? conocimientoOptions.filter((item) =>
+        item.nombre.toLowerCase().includes(trimmedConocimientoQuery.toLowerCase()),
+      )
+    : conocimientoOptions;
+  const normalizedNuevoConocimiento = nuevoConocimientoNombre.trim();
+  const canAddConocimiento = normalizedNuevoConocimiento.length >= 3;
+  const selectedConocimientos = conocimientoOptions.filter((item) =>
+    (formData.conocimientoIds || []).includes(item.idConocimiento),
+  );
+  const conocimientoPanelStyle = {
+    fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+    background:
+      'linear-gradient(135deg, rgba(16,185,129,0.10) 0%, rgba(255,255,255,0.95) 45%, rgba(14,165,233,0.08) 100%)',
+    boxShadow: '0 18px 40px rgba(15,23,42,0.08)',
+    borderColor: 'rgba(16,185,129,0.18)',
+    '--kn-ink': '#0f172a',
+    '--kn-muted': '#64748b',
+    '--kn-accent': '#10b981',
+    '--kn-accent-2': '#0ea5e9',
+  } as CSSProperties;
 
   useEffect(() => { 
     if (!convocatoria) { 
@@ -162,6 +244,7 @@ export function ConvocatoriaForm({
         fechaFin: defaults.fechaFin, 
         requisitosMinimos: '', 
         funcionesPrincipales: '', 
+        conocimientoIds: [],
         salarioMin: '', 
         salarioMax: '', 
         estado: '', 
@@ -170,6 +253,12 @@ export function ConvocatoriaForm({
         pdfUrl: '',
       });
       setPdfFile(null);
+      setConocimientoQuery('');
+      setNuevoConocimientoNombre('');
+      setNuevoConocimientoEstado('ACTIVO');
+      setConocimientoError('');
+      setIsConocimientoModalOpen(false);
+      setPendingConocimientoNames([]);
       setOficinaQuery('');
       setOficinaOptions([]);
       return;
@@ -192,6 +281,7 @@ export function ConvocatoriaForm({
       fechaFin: toInputDate(convocatoria?.fechaFin),
       requisitosMinimos: convocatoria?.requisitosMinimos || '',
       funcionesPrincipales: convocatoria?.funcionesPrincipales || '',
+      conocimientoIds: parseConocimientoIds(convocatoria?.conocimientosIds),
       salarioMin: convocatoria?.salarioMin ? String(convocatoria.salarioMin) : '',
       salarioMax: convocatoria?.salarioMax ? String(convocatoria.salarioMax) : '',
       estado: convocatoria?.estadoId ? String(convocatoria.estadoId) : convocatoria?.estado || '',
@@ -200,6 +290,14 @@ export function ConvocatoriaForm({
       archivoGuid: convocatoria?.archivoGuid || '',
       pdfUrl: convocatoria?.pdfUrl || (convocatoria?.archivoGuid ? buildFileUrl(String(convocatoria.archivoGuid)) : ''),
     });
+    const names = normalizeConocimientos(convocatoria?.conocimientos);
+    const ids = parseConocimientoIds(convocatoria?.conocimientosIds);
+    setPendingConocimientoNames(ids.length ? [] : names);
+    setConocimientoQuery('');
+    setNuevoConocimientoNombre('');
+    setNuevoConocimientoEstado('ACTIVO');
+    setConocimientoError('');
+    setIsConocimientoModalOpen(false);
     setPdfFile(null);
   }, [convocatoria]);
 
@@ -221,6 +319,48 @@ export function ConvocatoriaForm({
 
     loadCatalogs();
   }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const loadConocimientos = async () => {
+      setIsConocimientoLoading(true);
+      try {
+        const items = await fetchConocimientosDropdown();
+        if (isActive) {
+          setConocimientoOptions(items);
+        }
+      } catch (err) {
+        if (isActive) {
+          setConocimientoOptions([]);
+        }
+      } finally {
+        if (isActive) {
+          setIsConocimientoLoading(false);
+        }
+      }
+    };
+    loadConocimientos();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pendingConocimientoNames.length || !conocimientoOptions.length) {
+      return;
+    }
+    const mappedIds = conocimientoOptions
+      .filter((item) =>
+        pendingConocimientoNames.some(
+          (name) => name.toLowerCase() === item.nombre.toLowerCase(),
+        ),
+      )
+      .map((item) => item.idConocimiento);
+    if (mappedIds.length > 0) {
+      setFormData((prev) => ({ ...prev, conocimientoIds: mappedIds }));
+    }
+    setPendingConocimientoNames([]);
+  }, [pendingConocimientoNames, conocimientoOptions]);
 
   useEffect(() => {
     let isActive = true;
@@ -350,6 +490,77 @@ export function ConvocatoriaForm({
     return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
   };
 
+  const handleToggleConocimiento = (id: number, checked: boolean) => {
+    setFormData((prev) => {
+      const current = prev.conocimientoIds || [];
+      if (checked) {
+        if (current.includes(id)) return prev;
+        return { ...prev, conocimientoIds: [...current, id] };
+      }
+      return {
+        ...prev,
+        conocimientoIds: current.filter((item: number) => item !== id),
+      };
+    });
+  };
+
+  const openConocimientoModal = () => {
+    setConocimientoError('');
+    setNuevoConocimientoNombre(conocimientoQuery.trim());
+    setNuevoConocimientoEstado('ACTIVO');
+    setIsConocimientoModalOpen(true);
+  };
+
+  const handleAgregarConocimiento = async () => {
+    const normalized = nuevoConocimientoNombre.trim();
+    if (normalized.length < 3) {
+      setConocimientoError('Escribe al menos 3 caracteres para registrar.');
+      return;
+    }
+    setConocimientoError('');
+    setIsConocimientoSaving(true);
+    try {
+      const existing = conocimientoOptions.find(
+        (item) => item.nombre.toLowerCase() === normalized.toLowerCase(),
+      );
+      if (existing) {
+        handleToggleConocimiento(existing.idConocimiento, true);
+        setIsConocimientoModalOpen(false);
+        return;
+      }
+      const idConocimiento = await upsertConocimiento({
+        idConocimiento: 0,
+        nombre: normalized,
+        estado: nuevoConocimientoEstado,
+      });
+      if (!idConocimiento) {
+        setConocimientoError('No se pudo registrar el conocimiento.');
+        return;
+      }
+      const exists = conocimientoOptions.some(
+        (item) => item.idConocimiento === idConocimiento,
+      );
+      if (!exists) {
+        setConocimientoOptions((prev) => [
+          ...prev,
+          { idConocimiento, nombre: normalized, estado: nuevoConocimientoEstado },
+        ]);
+      }
+      handleToggleConocimiento(idConocimiento, true);
+      setNuevoConocimientoNombre('');
+      setNuevoConocimientoEstado('ACTIVO');
+      setIsConocimientoModalOpen(false);
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        'No se pudo registrar el conocimiento.';
+      setConocimientoError(message);
+    } finally {
+      setIsConocimientoSaving(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -380,6 +591,16 @@ export function ConvocatoriaForm({
       const idConvocatoria = await upsertConvocatoria(payload);
       if (!idConvocatoria) {
         setError('No se pudo guardar el Servicio.');
+        return;
+      }
+
+      const okConocimientos = await setConvocatoriaConocimientos(
+        idConvocatoria,
+        formData.conocimientoIds || [],
+        usuarioAccion,
+      );
+      if (!okConocimientos) {
+        setError('El Servicio se guardó, pero no se pudieron registrar los conocimientos.');
         return;
       }
 
@@ -671,6 +892,224 @@ export function ConvocatoriaForm({
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 min-h-[120px]"
               />
             </div>
+            <div className="rounded-2xl border p-4 md:p-6 relative overflow-hidden" style={conocimientoPanelStyle}>
+              <div
+                className="pointer-events-none absolute -top-24 right-0 h-56 w-56 rounded-full opacity-60"
+                style={{
+                  background:
+                    'radial-gradient(circle, rgba(16,185,129,0.35), rgba(16,185,129,0.0) 70%)',
+                }}
+              />
+              <div
+                className="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full opacity-40"
+                style={{
+                  background:
+                    'radial-gradient(circle, rgba(14,165,233,0.30), rgba(14,165,233,0.0) 70%)',
+                }}
+              />
+              <div className="relative z-10 space-y-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p
+                      className="text-xs uppercase tracking-[0.2em] font-semibold"
+                      style={{ color: 'var(--kn-accent)' }}
+                    >
+                      Conocimientos requeridos
+                    </p>
+                    <p className="text-sm mt-1" style={{ color: 'var(--kn-muted)' }}>
+                      Marca los conocimientos que debe cumplir el postulante para este servicio.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="rounded-full border px-3 py-1 text-xs font-semibold"
+                      style={{
+                        color: 'var(--kn-ink)',
+                        borderColor: 'rgba(15,23,42,0.12)',
+                        background: 'rgba(255,255,255,0.7)',
+                      }}
+                    >
+                      Seleccionados: {selectedConocimientos.length}
+                    </span>
+                    <Button
+                      type="button"
+                      onClick={openConocimientoModal}
+                      className="gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md disabled:opacity-60"
+                      style={{
+                        background:
+                          'linear-gradient(135deg, rgba(16,185,129,0.95), rgba(14,165,233,0.85))',
+                      }}
+                    >
+                      + Añadir nuevo conocimiento
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label
+                    className="text-xs font-semibold uppercase tracking-[0.2em]"
+                    style={{ color: 'var(--kn-muted)' }}
+                    htmlFor="conocimientoQuery"
+                  >
+                    Ingrese tres caracteres del conocimiento
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      id="conocimientoQuery"
+                      type="text"
+                      value={conocimientoQuery}
+                      onChange={(event) => setConocimientoQuery(event.target.value)}
+                      placeholder="Ej: Gestión comunitaria, ofimática, administración"
+                      className="bg-white/90 border border-slate-200 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                    />
+
+                  </div>
+                  {trimmedConocimientoQuery.length > 0 && trimmedConocimientoQuery.length < 3 && (
+                    <span className="text-xs font-medium text-amber-600">
+                      Escribe al menos 3 caracteres para filtrar.
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-4">
+                  <div className="rounded-xl border border-slate-200/70 bg-white/75 p-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        Pool de conocimientos
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {filteredConocimientos.length} disponibles
+                      </span>
+                    </div>
+                    {isConocimientoLoading ? (
+                      <div className="text-sm text-slate-500">Cargando conocimientos...</div>
+                    ) : conocimientoOptions.length === 0 ? (
+                      <div className="text-sm text-slate-500">No hay conocimientos registrados.</div>
+                    ) : filteredConocimientos.length === 0 ? (
+                      <div className="text-sm text-slate-500">
+                        No hay conocimientos que coincidan con la búsqueda.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[260px] overflow-y-auto pr-1">
+                        {filteredConocimientos.map((conocimiento) => {
+                          const checked = (formData.conocimientoIds || []).includes(
+                            conocimiento.idConocimiento,
+                          );
+                          return (
+                            <label
+                              key={conocimiento.idConocimiento}
+                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                                checked
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-900 shadow-sm'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/40'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) =>
+                                  handleToggleConocimiento(
+                                    conocimiento.idConocimiento,
+                                    event.target.checked,
+                                  )
+                                }
+                                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span>{conocimiento.nombre}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-slate-200/70 bg-white/70 p-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        Seleccionados
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {selectedConocimientos.length} activos
+                      </span>
+                    </div>
+                    {selectedConocimientos.length === 0 ? (
+                      <div className="text-sm text-slate-500">
+                        Aún no has marcado conocimientos. Usa el panel izquierdo para seleccionarlos.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedConocimientos.map((item) => (
+                          <span
+                            key={item.idConocimiento}
+                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800"
+                          >
+                            {item.nombre}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Dialog open={isConocimientoModalOpen} onOpenChange={setIsConocimientoModalOpen}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Nuevo conocimiento</DialogTitle>
+                  <DialogDescription>
+                    Registra un nuevo conocimiento para el pool de selección.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Nombre del conocimiento *
+                    </label>
+                    <Input
+                      type="text"
+                      value={nuevoConocimientoNombre}
+                      onChange={(event) => setNuevoConocimientoNombre(event.target.value)}
+                      placeholder="Ej: Metodologías de capacitación grupal"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-700">Estado</label>
+                    <select
+                      value={nuevoConocimientoEstado}
+                      onChange={(event) =>
+                        setNuevoConocimientoEstado(event.target.value as 'ACTIVO' | 'INACTIVO')
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    >
+                      <option value="ACTIVO">ACTIVO</option>
+                      <option value="INACTIVO">INACTIVO</option>
+                    </select>
+                  </div>
+                  {conocimientoError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      {conocimientoError}
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsConocimientoModalOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleAgregarConocimiento}
+                    disabled={!canAddConocimiento || isConocimientoSaving}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isConocimientoSaving ? 'Guardando...' : 'Guardar conocimiento'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </Card>
 
@@ -734,5 +1173,12 @@ export function ConvocatoriaForm({
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
