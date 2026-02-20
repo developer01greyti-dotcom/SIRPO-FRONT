@@ -76,6 +76,13 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
     return false;
   };
 
+  const normalizeId = (value: any): string => {
+    if (value === null || value === undefined) return '';
+    const str = String(value).trim();
+    if (!str || str === '0') return '';
+    return str;
+  };
+
   const normalizeExperiencias = (items: any[]): Experiencia[] => {
     return items.map((item, index) => {
       const especificaRaw =
@@ -84,9 +91,11 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
         item.especifica ??
         false;
       const experienciaEspecifica = normalizeEspecifica(especificaRaw);
+      const idHvExperiencia = normalizeId(item.idHvExperiencia ?? item.id);
+      const id = idHvExperiencia || normalizeId(item.id) || String(index);
       return {
-        id: String(item.id ?? item.idHvExperiencia ?? index),
-        idHvExperiencia: String(item.idHvExperiencia ?? ''),
+        id,
+        idHvExperiencia,
         tipoExperiencia: item.tipoExperiencia ?? '',
         tipoExperienciaId: item.tipoExperienciaId ?? '',
         tipoEntidad: item.tipoEntidad ?? '',
@@ -383,7 +392,14 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
                         <Edit2 className="w-4 h-4 mr-2" />
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEliminarExperiencia(experiencia.id)} className="text-red-600">
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleEliminarExperiencia(
+                            experiencia.idHvExperiencia || experiencia.id,
+                          )
+                        }
+                        className="text-red-600"
+                      >
                         <Trash2 className="w-4 h-4 mr-2" />
                         Eliminar
                       </DropdownMenuItem>

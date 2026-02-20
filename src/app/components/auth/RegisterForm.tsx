@@ -35,6 +35,8 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearchingDoc, setIsSearchingDoc] = useState(false);
   const [isSearchingRuc, setIsSearchingRuc] = useState(false);
+  const [isDocLocked, setIsDocLocked] = useState(false);
+  const [isRucLocked, setIsRucLocked] = useState(false);
 
   const [numeroDocumento, setNumeroDocumento] = useState('');
   const [nombres, setNombres] = useState('');
@@ -326,6 +328,7 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
         if (sexoResp) setSexo(sexoResp);
         if (estadoCivilResp) setEstadoCivil(estadoCivilResp);
         setNacionalidad('PERUANA');
+        setIsDocLocked(true);
         return;
       }
       if (desc.includes('carnet') || desc.includes('extranjer') || desc.includes('ce')) {
@@ -388,6 +391,7 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
         if (nacionalidadResp) setNacionalidad(nacionalidadResp);
         if (sexoResp) setSexo(sexoResp);
         if (estadoCivilResp) setEstadoCivil(estadoCivilResp);
+        setIsDocLocked(true);
         return;
       }
       setFormError('Tipo de documento no soportado para busqueda.');
@@ -424,9 +428,11 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
         return;
       }
       setRazonSocial(razon);
+      setIsRucLocked(true);
     } catch (error) {
       console.error('Error al consultar RUC', error);
       setFormError('No se pudo consultar el RUC. Intente nuevamente.');
+      setIsRucLocked(false);
     } finally {
       setIsSearchingRuc(false);
     }
@@ -487,6 +493,9 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                     setTipoDocumento(value);
                     const selected = tipoDocumentoOptions.find((item) => String(item.id) === value);
                     setTipoDocumentoDesc(selected?.descripcion || '');
+                    if (isDocLocked) {
+                      setIsDocLocked(false);
+                    }
                   }}
                 >
                 <SelectTrigger className="h-9 py-1">
@@ -528,7 +537,12 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   className="h-9"
                   maxLength={tipoDocumentoDesc.toLowerCase().includes('dni') ? 8 : 12}
                   value={numeroDocumento}
-                  onChange={(e) => setNumeroDocumento(e.target.value)}
+                  onChange={(e) => {
+                    setNumeroDocumento(e.target.value);
+                    if (isDocLocked) {
+                      setIsDocLocked(false);
+                    }
+                  }}
                   required
                 />
                 </div>
@@ -559,6 +573,7 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   placeholder=""
                   value={nombres}
                   onChange={(e) => setNombres(e.target.value)}
+                  readOnly={isDocLocked}
                   required
                 />
               </div>
@@ -574,6 +589,7 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   placeholder=""
                   value={apellidoPaterno}
                   onChange={(e) => setApellidoPaterno(e.target.value)}
+                  readOnly={isDocLocked}
                   required
                 />
               </div>
@@ -592,6 +608,7 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   placeholder=""
                   value={apellidoMaterno}
                   onChange={(e) => setApellidoMaterno(e.target.value)}
+                  readOnly={isDocLocked}
                   required
                 />
               </div>
@@ -611,7 +628,12 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                     placeholder=""
                     maxLength={11}
                     value={numeroRuc}
-                    onChange={(e) => setNumeroRuc(e.target.value)}
+                    onChange={(e) => {
+                      setNumeroRuc(e.target.value);
+                      if (isRucLocked) {
+                        setIsRucLocked(false);
+                      }
+                    }}
                   />
                 </div>
                 <Button
@@ -637,6 +659,7 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                   placeholder=""
                   value={razonSocial}
                   onChange={(e) => setRazonSocial(e.target.value)}
+                  readOnly={isRucLocked}
                 />
               </div>
             </div>
@@ -750,5 +773,3 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
     </div>
   );
 }
-
-

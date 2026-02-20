@@ -74,6 +74,7 @@ export function ExperienciaForm({
     parseEspecifica(experiencia?.experienciaEspecifica),
   );
   const [isSearchingRuc, setIsSearchingRuc] = useState(false);
+  const [isRucLocked, setIsRucLocked] = useState<boolean>(Boolean(rucPersona || experiencia?.ruc));
   const [fechaInicioValue, setFechaInicioValue] = useState(experiencia?.fechaInicio || '');
   const [fechaFinValue, setFechaFinValue] = useState(experiencia?.fechaFin || '');
   const [distritoValue, setDistritoValue] = useState<string>(experiencia?.distritoId || '');
@@ -231,6 +232,7 @@ export function ExperienciaForm({
       setSaveMessageType(null);
       setFechaInicioValue('');
       setFechaFinValue('');
+      setIsRucLocked(false);
       if (rucPersona) {
         setRucValue(rucPersona);
       }
@@ -261,6 +263,7 @@ export function ExperienciaForm({
     setSaveMessageType(null);
     setFechaInicioValue(experiencia?.fechaInicio || '');
     setFechaFinValue(experiencia?.fechaFin || '');
+    setIsRucLocked(Boolean(rucPersona || experiencia?.ruc));
   }, [modo, experiencia, tipoExperienciaOptions, tipoEntidadOptions, motivoCeseOptions, rucPersona]);
 
   const handleDocumentoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -312,6 +315,7 @@ export function ExperienciaForm({
         return;
       }
       setNombreEntidadValue(razon);
+      setIsRucLocked(true);
     } catch (error) {
       setSaveMessage('No se pudo consultar el RUC. Intente nuevamente.');
       setSaveMessageType('error');
@@ -562,7 +566,12 @@ export function ExperienciaForm({
                 placeholder=""
                 maxLength={11}
                 value={rucValue}
-                onChange={(e) => setRucValue(e.target.value)}
+                onChange={(e) => {
+                  setRucValue(e.target.value);
+                  if (isRucLocked) {
+                    setIsRucLocked(false);
+                  }
+                }}
               />
               <Button
                 type="button"
@@ -588,6 +597,7 @@ export function ExperienciaForm({
               value={nombreEntidadValue}
               onChange={(e) => setNombreEntidadValue(e.target.value)}
               placeholder=""
+              readOnly={isRucLocked}
             />
           </div>
 

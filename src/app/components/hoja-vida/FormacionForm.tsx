@@ -54,6 +54,7 @@ export function FormacionForm({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveMessageType, setSaveMessageType] = useState<'success' | 'error' | null>(null);
   const [isSearchingRuc, setIsSearchingRuc] = useState(false);
+  const [isRucLocked, setIsRucLocked] = useState<boolean>(Boolean(formacion?.ruc));
   const [tipoInstitucion, setTipoInstitucion] = useState<string>(formacion?.tipoInstitucionId || '');
   const [tipoEntidad, setTipoEntidad] = useState<string>(formacion?.tipoEntidadId || '');
   const [nivelEstudio, setNivelEstudio] = useState<string>(formacion?.nivelEstudioId || '');
@@ -217,6 +218,7 @@ export function FormacionForm({
       setDocumentoEliminado(false);
       setSaveMessage(null);
       setSaveMessageType(null);
+      setIsRucLocked(false);
       return;
     }
 
@@ -240,6 +242,7 @@ export function FormacionForm({
     setDocumentoEliminado(false);
     setSaveMessage(null);
     setSaveMessageType(null);
+    setIsRucLocked(Boolean(formacion?.ruc));
   }, [modo, formacion]);
 
   const formatFechaDisplay = (value: string) => {
@@ -310,6 +313,7 @@ export function FormacionForm({
         return;
       }
       setInstitucionValue(razon);
+      setIsRucLocked(true);
     } catch (error) {
       setSaveMessage('No se pudo consultar el RUC. Intente nuevamente.');
       setSaveMessageType('error');
@@ -503,7 +507,12 @@ export function FormacionForm({
                     placeholder=""
                     maxLength={11}
                     value={rucValue}
-                    onChange={(e) => setRucValue(e.target.value)}
+                    onChange={(e) => {
+                      setRucValue(e.target.value);
+                      if (isRucLocked) {
+                        setIsRucLocked(false);
+                      }
+                    }}
                   />
                   <Button
                     type="button"
@@ -529,6 +538,7 @@ export function FormacionForm({
                   placeholder=""
                   value={institucionValue}
                   onChange={(e) => setInstitucionValue(e.target.value)}
+                  readOnly={isRucLocked}
                 />
               </div>
 

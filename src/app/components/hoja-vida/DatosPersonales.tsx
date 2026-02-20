@@ -1426,7 +1426,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 value={formData.nombres}
 
                 onChange={(e) => updateField('nombres', e.target.value)}
-
+                readOnly
                 required
 
               />
@@ -1452,7 +1452,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 value={formData.apellidoPaterno}
 
                 onChange={(e) => updateField('apellidoPaterno', e.target.value)}
-
+                readOnly
                 required
 
               />
@@ -1478,7 +1478,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 value={formData.apellidoMaterno}
 
                 onChange={(e) => updateField('apellidoMaterno', e.target.value)}
-
+                readOnly
                 required
 
               />
@@ -1612,6 +1612,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 lang="es-PE"
                 value={formData.fechaNacimiento}
                 onChange={(e) => updateField('fechaNacimiento', e.target.value)}
+                readOnly
                 required
               />
 

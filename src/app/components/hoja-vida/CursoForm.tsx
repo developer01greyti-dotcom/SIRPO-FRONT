@@ -64,6 +64,7 @@ export function CursoForm({
   const [rucValue, setRucValue] = useState<string>(curso?.ruc || '');
   const [institucionValue, setInstitucionValue] = useState<string>(curso?.institucion || '');
   const [isSearchingRuc, setIsSearchingRuc] = useState(false);
+  const [isRucLocked, setIsRucLocked] = useState<boolean>(Boolean(curso?.ruc));
   const [tipoEstudio, setTipoEstudio] = useState<string>(curso?.tipoEstudio || '');
   const [distritoValue, setDistritoValue] = useState<string>(curso?.distrito || '');
   const [ubigeoQuery, setUbigeoQuery] = useState<string>(curso?.distrito || '');
@@ -209,6 +210,7 @@ export function CursoForm({
       setDocumentoEliminado(false);
       setSaveMessage(null);
       setSaveMessageType(null);
+      setIsRucLocked(false);
       return;
     }
 
@@ -230,6 +232,7 @@ export function CursoForm({
     setDocumentoEliminado(false);
     setSaveMessage(null);
     setSaveMessageType(null);
+    setIsRucLocked(Boolean(curso?.ruc));
   }, [modo, curso, tipoInstitucionOptions]);
 
   useEffect(() => {
@@ -311,6 +314,7 @@ export function CursoForm({
         return;
       }
       setInstitucionValue(razon);
+      setIsRucLocked(true);
     } catch (error) {
       setSaveMessage('No se pudo consultar el RUC. Intente nuevamente.');
       setSaveMessageType('error');
@@ -538,10 +542,15 @@ export function CursoForm({
                       name="ruc"
                       type="text"
                       placeholder=""
-                      maxLength={11}
-                      value={rucValue}
-                      onChange={(e) => setRucValue(e.target.value)}
-                    />
+                    maxLength={11}
+                    value={rucValue}
+                    onChange={(e) => {
+                      setRucValue(e.target.value);
+                      if (isRucLocked) {
+                        setIsRucLocked(false);
+                      }
+                    }}
+                  />
                     <Button
                       type="button"
                       variant="outline"
@@ -698,6 +707,7 @@ export function CursoForm({
                   placeholder=""
                   value={institucionValue}
                   onChange={(e) => setInstitucionValue(e.target.value)}
+                  readOnly={isRucLocked}
                 />
               </div>
 
