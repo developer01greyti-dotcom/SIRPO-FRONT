@@ -1,9 +1,10 @@
 ﻿import { useEffect, useState } from 'react';
-import { X, Calendar, Briefcase, Building2, User, Mail, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Calendar, Briefcase, Building2, User, Mail, Save, CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { VistaPrevia } from '../hoja-vida/VistaPrevia';
+import { apiClient } from '../../api/client';
 import { updatePostulacion } from '../../api/postulaciones';
 import {
   fetchHojaVidaDatos,
@@ -12,6 +13,8 @@ import {
   fetchHvExpList,
   fetchHvFormList,
 } from '../../api/hojaVida';
+import { fetchDeclaracionTipos } from '../../api/declaraciones';
+import { fetchHvRefArchivo } from '../../api/hvRefArchivo';
 
 interface Postulacion {
   id: string;
@@ -114,19 +117,63 @@ export function DetallePostulacionAdmin({
       setHvLoading(true);
       setHvError(null);
       try {
-        const [datos, formacionesData, cursosData, experienciasData, declaracionesData] = await Promise.all([
+        const [datos, formacionesData, cursosData, experienciasData, declaracionesData, declaracionTipos] = await Promise.all([
           fetchHojaVidaDatos(idHojaVida),
           fetchHvFormList(idHojaVida),
           fetchHvCurList(idHojaVida),
           fetchHvExpList(idHojaVida),
           fetchHvDeclList(idHojaVida),
+          fetchDeclaracionTipos(),
         ]);
         if (!isActive) return;
         setHvDatos(datos);
         setHvFormaciones(Array.isArray(formacionesData) ? formacionesData : formacionesData ? [formacionesData] : []);
         setHvCursos(Array.isArray(cursosData) ? cursosData : cursosData ? [cursosData] : []);
         setHvExperiencias(Array.isArray(experienciasData) ? experienciasData : experienciasData ? [experienciasData] : []);
-        setHvDeclaraciones(Array.isArray(declaracionesData) ? declaracionesData : declaracionesData ? [declaracionesData] : []);
+        const declList = Array.isArray(declaracionesData)
+          ? declaracionesData
+          : declaracionesData
+            ? [declaracionesData]
+            : [];
+        const tipos = Array.isArray(declaracionTipos) ? declaracionTipos : [];
+        const tipoMap = new Map<number, { nombre?: string; descripcion?: string }>();
+        tipos.forEach((tipo: any) => {
+          const id = Number(tipo.idDeclaracionTipo ?? tipo.id_declaracion_tipo ?? tipo.id ?? 0);
+          if (!Number.isFinite(id) || id <= 0) return;
+          tipoMap.set(id, {
+            nombre: tipo.nombre ?? '',
+            descripcion: tipo.descripcion ?? '',
+          });
+        });
+        const declEnriched = await Promise.all(
+          declList.map(async (item: any) => {
+            const idHvDecl = Number(item.idHvDecl ?? item.idHvDeclaracion ?? item.id ?? 0);
+            const idDeclaracionTipo = Number(
+              item.idDeclaracionTipo ?? item.id_declaracion_tipo ?? 0,
+            );
+            let archivoGuid = item.archivoGuid ?? '';
+            if (!archivoGuid && idHvDecl) {
+              try {
+                const archivos = await fetchHvRefArchivo('HV_DECL', idHvDecl);
+                const actual = archivos.find(
+                  (archivo) => String(archivo?.tipoArchivo || '').toUpperCase() === 'HV_DECL',
+                );
+                archivoGuid = actual?.guid ?? '';
+              } catch {
+                // ignore
+              }
+            }
+            const tipo = tipoMap.get(idDeclaracionTipo);
+            return {
+              ...item,
+              idDeclaracionTipo,
+              nombre: item.nombre ?? tipo?.nombre ?? '',
+              descripcion: item.descripcion ?? tipo?.descripcion ?? '',
+              archivoGuid,
+            };
+          }),
+        );
+        setHvDeclaraciones(declEnriched);
       } catch (error) {
         if (isActive) {
           setHvError('No se pudo cargar la hoja de vida.');
@@ -239,6 +286,30 @@ export function DetallePostulacionAdmin({
       archivoAdjunto: null,
       archivoGuid: item.archivoGuid ?? '',
     }));
+
+  const anexosGuid =
+    mapDeclaraciones(hvDeclaraciones).find((item) => item.archivoGuid)?.archivoGuid || '';
+
+  const handleVerAnexos = async () => {
+    if (!anexosGuid) {
+      return;
+    }
+    try {
+      const response = await apiClient.get('/hv_ref_archivo/file', {
+        params: { guid: anexosGuid },
+        responseType: 'blob',
+      });
+      const blob = response.data as Blob;
+      if (!blob || blob.size === 0) {
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch {
+      // ignore
+    }
+  };
 
   const getEstadoBadge = (estado: string) => {
     const normalized = (estado || '').toLowerCase().trim();
@@ -415,6 +486,37 @@ export function DetallePostulacionAdmin({
         </div>
       </Card>
 
+      {/* Ver anexos */}
+      <Card className="p-5 border-blue-200 bg-blue-50">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-blue-600 rounded-full">
+              <FileText className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Declaraciones Juradas</p>
+              <p className="text-sm text-gray-600">
+                Anexos 02, 03 y 04 en un solo PDF.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-100"
+            onClick={handleVerAnexos}
+            disabled={!anexosGuid}
+          >
+            <FileText className="w-4 h-4" />
+            Ver anexos
+          </Button>
+        </div>
+        {!anexosGuid && (
+          <p className="text-xs text-blue-700 mt-3">
+            Aún no se ha generado el PDF de anexos para este registro.
+          </p>
+        )}
+      </Card>
+
       {/* Gestión de Estado */}
       {canEditEstado && (
         <Card className="p-6 bg-amber-50 border-amber-200">
@@ -498,7 +600,7 @@ export function DetallePostulacionAdmin({
             formaciones={mapFormaciones(hvFormaciones)}
             cursos={mapCursos(hvCursos)}
             experiencias={mapExperiencias(hvExperiencias)}
-            declaraciones={mapDeclaraciones(hvDeclaraciones)}
+          declaraciones={[]}
             hideHeader={true}
           />
         )}

@@ -4,6 +4,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
 import type { LoginResponse } from '../../api/auth';
+import { apiClient } from '../../api/client';
 import { downloadHojaVidaPdf, fetchHojaVidaActual, fetchHojaVidaDatos, fetchHvCurList, fetchHvDeclList, fetchHvExpList, fetchHvFormList, updateHojaVidaEstado, type HojaVidaActual } from '../../api/hojaVida'; 
 import { PAISES_CATALOGO } from '../../data/paises';
 
@@ -98,6 +99,7 @@ interface VistaPreviaProps {
   experiencias?: Experiencia[];
   declaraciones?: Declaracion[];
   hideHeader?: boolean;
+  showDeclaraciones?: boolean;
 }
 
 export function VistaPrevia({
@@ -108,6 +110,7 @@ export function VistaPrevia({
   experiencias: experienciasProp,
   declaraciones: declaracionesProp,
   hideHeader,
+  showDeclaraciones = false,
 }: VistaPreviaProps) {
   const [datosPersonalesState, setDatosPersonalesState] = useState<DatosPersonalesData | null>(null);
   const [formacionesState, setFormacionesState] = useState<Formacion[]>([]);
@@ -135,19 +138,71 @@ export function VistaPrevia({
     return `${apiBaseUrl}/hv_ref_archivo/file?${params.toString()}`;
   };
 
-  const downloadFile = (url: string, filename?: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    if (filename) {
-      link.download = filename;
+  const extractGuidFromValue = (value: string): string => {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return '';
+    if (/^[0-9a-fA-F-]{32,}$/.test(trimmed) && trimmed.includes('-')) {
+      return trimmed;
     }
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.click();
+    try {
+      const parsed = new URL(trimmed, window.location.origin);
+      const guid = parsed.searchParams.get('guid');
+      return guid ? guid.trim() : '';
+    } catch {
+      return '';
+    }
   };
 
-  const previewFile = (url: string) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const fetchProtectedFile = async (value: string): Promise<Blob | null> => {
+    const guid = extractGuidFromValue(value);
+    if (!guid) return null;
+    const response = await apiClient.get('/hv_ref_archivo/file', {
+      params: { guid },
+      responseType: 'blob',
+    });
+    return response.data as Blob;
+  };
+
+  const downloadFile = async (value: string, filename?: string) => {
+    try {
+      const blob = await fetchProtectedFile(value);
+      if (!blob) {
+        const link = document.createElement('a');
+        link.href = value;
+        if (filename) {
+          link.download = filename;
+        }
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.click();
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      if (filename) {
+        link.download = filename;
+      }
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setDownloadError('No se pudo descargar el archivo.');
+    }
+  };
+
+  const previewFile = async (value: string) => {
+    try {
+      const blob = await fetchProtectedFile(value);
+      if (!blob) {
+        window.open(value, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch {
+      setDownloadError('No se pudo abrir el archivo.');
+    }
   };
 
   const parseFecha = (value: string): Date | null => {
@@ -547,6 +602,13 @@ export function VistaPrevia({
     ),
   }));
   const declaraciones = declaracionesProp ?? declaracionesState;
+  const declaracionesVisibles = showDeclaraciones
+    ? declaraciones.filter((decl) => {
+        const nombre = (decl.nombre || '').trim();
+        const descripcion = (decl.descripcion || '').trim();
+        return Boolean(nombre || descripcion || decl.archivoGuid || decl.archivoAdjunto);
+      })
+    : [];
   const calcularTotalExperiencia = (items: Experiencia[]) => {
     let totalDays = 0;
     items.forEach((exp) => {
@@ -581,7 +643,7 @@ export function VistaPrevia({
       formaciones.length ||
       cursos.length ||
       experiencias.length ||
-      declaraciones.length,
+      declaracionesVisibles.length,
   );
   const canDownload = hasContent && !loadError;
 
@@ -1108,6 +1170,7 @@ export function VistaPrevia({
       </Card>
 
       {/* Declaraciones */}
+      {declaracionesVisibles.length > 0 && (
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -1116,9 +1179,9 @@ export function VistaPrevia({
           <h4 className="text-lg font-bold" style={{ color: '#04a25c' }}>Declaraciones Juradas</h4>
         </div>
 
-        {declaraciones.length > 0 ? (
+        {declaracionesVisibles.length > 0 ? (
           <div className="space-y-6">
-            {declaraciones.map((decl, index) => (
+            {declaracionesVisibles.map((decl, index) => (
               <div key={decl.id}>
                 {index > 0 && <Separator className="my-6" />}
                 <div className="relative pl-6 border-l-4 border-blue-600">
@@ -1165,13 +1228,9 @@ export function VistaPrevia({
               </div>
             ))}
           </div>
-        ) : (
-          <div className="text-center py-8">
-            <CheckCircle2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No se han registrado declaraciones</p>
-          </div>
-        )}
+        ) : null}
       </Card>
+      )}
 
       {/* Footer Information */}
       <Card className="p-6 bg-green-50 border-green-200">

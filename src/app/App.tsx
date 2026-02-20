@@ -33,7 +33,7 @@ import { DeclaracionesJuradasAdmin } from './components/admin/DeclaracionesJurad
 import { GestionUsuariosAdmin } from './components/admin/GestionUsuariosAdmin';
 import type { LoginResponse } from './api/auth';
 import { fetchConvocatoriasList } from './api/convocatorias';
-import { fetchHojaVidaActual } from './api/hojaVida';
+import { attachDeclaracionesPdf, downloadDeclaracionesPdf, fetchHojaVidaActual, fetchHojaVidaDatos } from './api/hojaVida';
 import { fetchPostulacionesByPersona, upsertPostulacion, type PostulacionListItem } from './api/postulaciones';
 import { mapTipoUsuarioToRole, type AdminRole } from './utils/roles';
 
@@ -54,6 +54,15 @@ interface Convocatoria {
   conocimientos?: string[];
   conocimientosIds?: number[];
 }
+
+type CompletarPostulacionPayload = {
+  familiares?: Array<{
+    apellidos: string;
+    nombres: string;
+    relacion: string;
+    unidad: string;
+  }>;
+};
 
 // Interfaces para Hoja de Vida
 export interface DatosPersonalesData {
@@ -846,7 +855,71 @@ export default function App() {
     setSelectedConvocatoria(null);
   };
 
-  const handleCompletarPostulacion = async () => {
+  const buildDeclaracionPdfParams = async (
+    idHojaVida: number,
+    convocatoria: Convocatoria,
+    user: LoginResponse,
+    familiares: CompletarPostulacionPayload['familiares'] = [],
+  ) => {
+    let distrito = '';
+    let provincia = '';
+    let departamento = '';
+    let idUbigeo: string | number | undefined;
+    let correo2 = '';
+
+    try {
+      const datos = await fetchHojaVidaDatos(idHojaVida);
+      if (datos) {
+        distrito = String(datos.distrito || '').trim();
+        idUbigeo = datos.distritoId;
+        correo2 = String(datos.correoSecundario || '').trim();
+        if (distrito.includes('/')) {
+          const parts = distrito
+            .split('/')
+            .map((item) => item.trim())
+            .filter(Boolean);
+          if (parts.length >= 3) {
+            departamento = parts[0] || '';
+            provincia = parts[1] || '';
+            distrito = parts[2] || distrito;
+          } else if (parts.length === 2) {
+            provincia = parts[0] || '';
+            distrito = parts[1] || distrito;
+          }
+        }
+      }
+    } catch {
+      // fallback to backend resolution
+    }
+
+    const oficinaZonal =
+      convocatoria.oficinaZonal?.trim() ||
+      (convocatoria.oficinaCoordinacion || '').split('/')[0]?.trim() ||
+      '';
+
+    return {
+      idConvocatoria: Number(convocatoria.id || 0) || undefined,
+      idPersona: user?.idPersona ? Number(user.idPersona) : undefined,
+      oficinaZonal: oficinaZonal || undefined,
+      oficinaCoordinacion: convocatoria.oficinaCoordinacion,
+      distrito: distrito || undefined,
+      provincia: provincia || undefined,
+      departamento: departamento || undefined,
+      idUbigeo: idUbigeo,
+      correo2: correo2 || undefined,
+      familiares:
+        familiares && familiares.length > 0
+          ? familiares.map((familiar) => ({
+              apellidos: familiar.apellidos,
+              nombres: familiar.nombres,
+              relacion: familiar.relacion,
+              unidad: familiar.unidad,
+            }))
+          : undefined,
+    };
+  };
+
+  const handleCompletarPostulacion = async (payload: CompletarPostulacionPayload = {}) => {
     if (isSubmittingPostulacion) {
       return;
     }
@@ -870,6 +943,29 @@ export default function App() {
     }
     try {
       setIsSubmittingPostulacion(true);
+      const pdfParams = await buildDeclaracionPdfParams(
+        hojaVidaId,
+        selectedConvocatoria,
+        postulanteUser,
+        payload.familiares,
+      );
+      const { blob, contentType } = await downloadDeclaracionesPdf(hojaVidaId, pdfParams);
+      if (!String(contentType).toLowerCase().includes('pdf')) {
+        throw new Error('No se pudo generar el PDF de declaraciones juradas.');
+      }
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+      if (pdfBlob.size === 0) {
+        throw new Error('El PDF de declaraciones juradas llego vacio.');
+      }
+      const pdfFile = new File([pdfBlob], `declaraciones_${hojaVidaId}.pdf`, {
+        type: 'application/pdf',
+      });
+      await attachDeclaracionesPdf({
+        idHojaVida: hojaVidaId,
+        usuarioAccion: postulanteUser.idUsuario,
+        pdfFile,
+      });
+
       const numeroPostulacion = await upsertPostulacion({
         idPostulacion: 0,
         idPersona: postulanteUser.idPersona,
@@ -893,6 +989,7 @@ export default function App() {
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
+        error?.message ||
         'No se pudo completar el registro.';
       alert(message);
     } finally {

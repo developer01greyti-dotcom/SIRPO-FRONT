@@ -89,7 +89,9 @@ interface InterfazPostulacionProps {
   experiencias?: Experiencia[];
   user?: LoginResponse | null;
   onClose: () => void;
-  onCompletarPostulacion: () => void;
+  onCompletarPostulacion: (payload: {
+    familiares: FamiliarDevida[];
+  }) => Promise<void> | void;
   onRealizarCambios: () => void;
   isSubmitting?: boolean;
 }
@@ -250,10 +252,14 @@ export function InterfazPostulacion({
   const requisitosCompletos =
     aceptaDeclaracion && anexosCompletos && conocimientosCompletos && !isConocimientosLoading;
   const isSubmittingEffective = isSubmitting || isLocalSubmitting;
-  const handleCompletar = () => {
+  const handleCompletar = async () => {
     if (isSubmittingEffective) return;
     setIsLocalSubmitting(true);
-    onCompletarPostulacion();
+    try {
+      await onCompletarPostulacion({ familiares: familiaresDevida });
+    } finally {
+      setIsLocalSubmitting(false);
+    }
   };
 
   useEffect(() => {

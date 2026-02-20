@@ -1,4 +1,6 @@
 import { apiClient } from './client';
+import { fetchDeclaracionTipos } from './declaraciones';
+import { deleteHvRefArchivo, fetchHvRefArchivo, saveHvRefArchivo } from './hvRefArchivo';
 
 export interface HojaVidaActual { 
   idHojaVida: number; 
@@ -602,6 +604,95 @@ export const deleteHvForm = async (
     data: { estructura: { idHvFormacion, usuarioAccion } },
   });
   return Boolean(response.data);
+};
+
+const normalizeDeclaracionTipoIds = (items: any[]): number[] => {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) =>
+      Number(item?.idDeclaracionTipo ?? item?.id_declaracion_tipo ?? item?.id ?? 0),
+    )
+    .filter((id) => Number.isFinite(id) && id > 0);
+};
+
+const normalizeHvDeclId = (item: any): number => {
+  return Number(item?.idHvDecl ?? item?.idHvDeclaracion ?? item?.id ?? 0) || 0;
+};
+
+const normalizeHvDeclTipoId = (item: any): number => {
+  return Number(item?.idDeclaracionTipo ?? item?.id_declaracion_tipo ?? 0) || 0;
+};
+
+export const attachDeclaracionesPdf = async (params: {
+  idHojaVida: number;
+  usuarioAccion: number;
+  pdfFile: File;
+  declaracionTipoIds?: number[];
+}): Promise<void> => {
+  const { idHojaVida, usuarioAccion, pdfFile } = params;
+  if (!idHojaVida || !pdfFile) {
+    return;
+  }
+
+  let declaracionTipoIds: number[] = [];
+  if (params.declaracionTipoIds && params.declaracionTipoIds.length > 0) {
+    declaracionTipoIds = params.declaracionTipoIds;
+  } else {
+    try {
+      const tipos = await fetchDeclaracionTipos();
+      declaracionTipoIds = normalizeDeclaracionTipoIds(tipos);
+    } catch {
+      declaracionTipoIds = [];
+    }
+  }
+  if (declaracionTipoIds.length === 0) {
+    declaracionTipoIds = [1, 2, 3];
+  }
+
+  const existentes = await fetchHvDeclList(idHojaVida);
+
+  for (const tipoId of declaracionTipoIds) {
+    const existente = existentes.find(
+      (item) => normalizeHvDeclTipoId(item) === tipoId,
+    );
+    let idHvDecl = normalizeHvDeclId(existente);
+    if (!idHvDecl) {
+      idHvDecl = await upsertHvDecl({
+        idHvDecl: 0,
+        idHojaVida,
+        idDeclaracionTipo: tipoId,
+        idArchivo: 1,
+        estado: 'ACTIVO',
+        usuarioAccion,
+      });
+    }
+    if (!idHvDecl) {
+      throw new Error('No se pudo registrar la declaracion jurada.');
+    }
+
+    const archivos = await fetchHvRefArchivo('HV_DECL', idHvDecl);
+    const actual = archivos.find(
+      (item) => String(item?.tipoArchivo || '').toUpperCase() === 'HV_DECL',
+    );
+    if (actual?.idHvRefArchivo) {
+      await deleteHvRefArchivo(actual.idHvRefArchivo, usuarioAccion);
+    }
+
+    const extension = pdfFile.name.split('.').pop() || 'pdf';
+    await saveHvRefArchivo(pdfFile, {
+      idHvRefArchivo: 0,
+      idHojaVida,
+      entidad: 'HV_DECL',
+      idEntidad: idHvDecl,
+      tipoArchivo: 'HV_DECL',
+      nombreOrig: pdfFile.name,
+      ext: extension,
+      mime: pdfFile.type || 'application/pdf',
+      sizeBytes: pdfFile.size,
+      ruta: 'hv',
+      usuarioAccion,
+    });
+  }
 };
 
 export const deleteHvCur = async (
