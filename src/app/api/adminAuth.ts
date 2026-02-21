@@ -39,28 +39,65 @@ const normalizeAdminResponse = (raw: any): AdminLoginResponse | null => {
   const idAdmin = Number(
     raw.idAdmin ??
       raw.id_admin ??
+      raw.ID_ADMIN ??
       raw.idUsuario ??
       raw.id_usuario ??
+      raw.ID_USUARIO ??
       raw.idAdminUsuario ??
+      raw.ID_ADMIN_USUARIO ??
       raw.id ??
       0,
   );
   if (!idAdmin) return null;
   return {
     idAdmin,
-    usuario: String(raw.usuario ?? raw.username ?? raw.user ?? ''),
-    nombreCompleto: String(raw.nombreCompleto ?? raw.nombre_completo ?? raw.nombre ?? ''),
-    rol: String(raw.rol ?? raw.rolNombre ?? raw.rol_nombre ?? raw.rolDesc ?? raw.rol_desc ?? ''),
-    rolId: Number(raw.rolId ?? raw.idRol ?? raw.id_rol ?? 0),
-    email: String(raw.email ?? raw.correo ?? raw.mail ?? ''),
-    idOficinaZonal: Number(raw.idOficinaZonal ?? raw.id_oficina_zonal ?? raw.idZonal ?? 0) || undefined,
-    oficinaZonal: String(raw.oficinaZonal ?? raw.nombreOficinaZonal ?? raw.oficina_zonal ?? ''),
+    usuario: String(raw.usuario ?? raw.USUARIO ?? raw.username ?? raw.user ?? ''),
+    nombreCompleto: String(
+      raw.nombreCompleto ?? raw.nombre_completo ?? raw.NOMBRE_COMPLETO ?? raw.nombre ?? raw.NOMBRE ?? '',
+    ),
+    rol: String(
+      raw.rol ??
+        raw.ROL ??
+        raw.rolNombre ??
+        raw.rol_nombre ??
+        raw.rolDesc ??
+        raw.rol_desc ??
+        raw.ROL_NOMBRE ??
+        raw.ROL_DESC ??
+        '',
+    ),
+    rolId: Number(raw.rolId ?? raw.ROLID ?? raw.idRol ?? raw.ID_ROL ?? raw.id_rol ?? raw.IDROL ?? 0),
+    email: String(raw.email ?? raw.correo ?? raw.CORREO ?? raw.mail ?? raw.MAIL ?? ''),
+    idOficinaZonal:
+      Number(
+        raw.idOficinaZonal ??
+          raw.id_oficina_zonal ??
+          raw.ID_OFICINA_ZONAL ??
+          raw.idZonal ??
+          raw.ID_ZONAL ??
+          raw.IDZONAL ??
+          0,
+      ) || undefined,
+    oficinaZonal: String(
+      raw.oficinaZonal ??
+        raw.nombreOficinaZonal ??
+        raw.nombre_zonal ??
+        raw.oficina_zonal ??
+        raw.OFICINA_ZONAL ??
+        raw.NOMBRE_OFICINA_ZONAL ??
+        raw.NOMBRE_ZONAL ??
+        raw.ZONAL ??
+        '',
+    ),
     tipoUsuario:
       raw.tipoUsuario ??
       raw.tipo_usuario ??
       raw.tipoUsuarioId ??
       raw.idTipoUsuario ??
       raw.id_tipo_usuario ??
+      raw.TIPOUSUARIO ??
+      raw.TIPO_USUARIO ??
+      raw.ID_TIPO_USUARIO ??
       undefined,
   };
 };

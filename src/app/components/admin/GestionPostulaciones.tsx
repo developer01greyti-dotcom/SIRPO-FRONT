@@ -112,14 +112,24 @@ export function GestionPostulaciones({
 
   const normalizeOz = (value?: string) => (value || '').trim().toUpperCase();
   const matchesAdminOz = (item: any) => {
-    if (!adminOficinaZonalId && !adminOficinaZonal) return true;
-    const itemOzId = item?.idOficinaZonal ?? item?.id_oficina_zonal ?? item?.idZonal ?? '';
+    if (!adminOficinaZonalId && !adminOficinaZonal) {
+      return adminRole === 'jefe' ? false : true;
+    }
+    const itemOzId =
+      item?.idOficinaZonal ??
+      item?.id_oficina_zonal ??
+      item?.ID_OFICINA_ZONAL ??
+      item?.idZonal ??
+      item?.ID_ZONAL ??
+      '';
     if (adminOficinaZonalId && String(itemOzId) === String(adminOficinaZonalId)) {
       return true;
     }
     const itemOzName =
       item?.oficinaZonal ??
       item?.nombreOficinaZonal ??
+      item?.OFICINA_ZONAL ??
+      item?.NOMBRE_OFICINA_ZONAL ??
       (String(item?.oficinaCoordinacion ?? '').includes('/')
         ? String(item?.oficinaCoordinacion ?? '').split('/')[0]?.trim()
         : '');

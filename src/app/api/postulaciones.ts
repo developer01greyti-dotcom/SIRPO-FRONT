@@ -187,10 +187,13 @@ export const fetchPostulacionesByPersona = async (
     estado: item.estado ?? '',
     observacion: item.observacion ?? item.observacion_postulacion ?? '',
     fechaPostulacion: item.fechaPostulacion ?? item.fecha_postulacion ?? '',
-    idOficinaCoordinacion: item.idOficinaCoordinacion ?? item.id_oficina_coordinacion ?? undefined,
-    oficinaCoordinacion: item.oficinaCoordinacion ?? item.nombreOficinaCoordinacion ?? '',
-    idOficinaZonal: item.idOficinaZonal ?? item.id_oficina_zonal ?? undefined,
-    oficinaZonal: item.oficinaZonal ?? item.nombreOficinaZonal ?? '',
+    idOficinaCoordinacion:
+      item.idOficinaCoordinacion ?? item.id_oficina_coordinacion ?? item.ID_OFICINA_COORDINACION ?? undefined,
+    oficinaCoordinacion:
+      item.oficinaCoordinacion ?? item.nombreOficinaCoordinacion ?? item.OFICINA_COORDINACION ?? '',
+    idOficinaZonal: item.idOficinaZonal ?? item.id_oficina_zonal ?? item.ID_OFICINA_ZONAL ?? undefined,
+    oficinaZonal:
+      item.oficinaZonal ?? item.nombreOficinaZonal ?? item.OFICINA_ZONAL ?? item.NOMBRE_OFICINA_ZONAL ?? '',
   }));
 };
 
@@ -215,10 +218,13 @@ export const fetchPostulacionesByConvocatoria = async (
     estado: item.estado ?? '',
     observacion: item.observacion ?? item.observacion_postulacion ?? '',
     fechaPostulacion: item.fechaPostulacion ?? item.fecha_postulacion ?? '',
-    idOficinaCoordinacion: item.idOficinaCoordinacion ?? item.id_oficina_coordinacion ?? undefined,
-    oficinaCoordinacion: item.oficinaCoordinacion ?? item.nombreOficinaCoordinacion ?? '',
-    idOficinaZonal: item.idOficinaZonal ?? item.id_oficina_zonal ?? undefined,
-    oficinaZonal: item.oficinaZonal ?? item.nombreOficinaZonal ?? '',
+    idOficinaCoordinacion:
+      item.idOficinaCoordinacion ?? item.id_oficina_coordinacion ?? item.ID_OFICINA_COORDINACION ?? undefined,
+    oficinaCoordinacion:
+      item.oficinaCoordinacion ?? item.nombreOficinaCoordinacion ?? item.OFICINA_COORDINACION ?? '',
+    idOficinaZonal: item.idOficinaZonal ?? item.id_oficina_zonal ?? item.ID_OFICINA_ZONAL ?? undefined,
+    oficinaZonal:
+      item.oficinaZonal ?? item.nombreOficinaZonal ?? item.OFICINA_ZONAL ?? item.NOMBRE_OFICINA_ZONAL ?? '',
     convocatoria: item.convocatoria ?? item.titulo ?? item.nombre ?? '',
     perfil: item.perfil ?? item.nombrePerfil ?? item.categoria ?? '',
     postulanteNombre: item.postulanteNombre ?? item.nombreCompleto ?? item.nombres ?? '',

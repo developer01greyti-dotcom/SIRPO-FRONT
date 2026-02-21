@@ -663,7 +663,7 @@ export default function App() {
   const isAdminSectionAllowed = (section: string, role?: AdminRole | null) => {
     if (!role) return true;
     if (section === 'registros') return true;
-    if (section === 'servicios') return role === 'superadmin' || role === 'date';
+    if (section === 'servicios') return role === 'superadmin' || role === 'date' || role === 'jefe';
     if (section === 'plantillas') return role === 'superadmin' || role === 'date';
     if (section === 'declaraciones') return role === 'superadmin' || role === 'date';
     if (section === 'usuarios') return role === 'superadmin' || role === 'date';
@@ -718,13 +718,22 @@ export default function App() {
   const mapConvocatoria = (item: any): Convocatoria => ({
     id: String(item.idConvocatoria ?? item.id ?? ''),
     nombre: item.nombre ?? '',
-    oficinaZonal: item.oficinaZonal ?? item.nombreOficinaZonal ?? '',
+    oficinaZonal:
+      item.oficinaZonal ??
+      item.nombreOficinaZonal ??
+      item.nombre_zonal ??
+      item.OFICINA_ZONAL ??
+      item.NOMBRE_OFICINA_ZONAL ??
+      item.NOMBRE_ZONAL ??
+      '',
     oficinaCoordinacion: item.oficinaCoordinacion ?? '',
     idOficinaZonal:
       item.idOficinaZonal !== undefined && item.idOficinaZonal !== null
         ? Number(item.idOficinaZonal)
         : item.id_oficina_zonal !== undefined && item.id_oficina_zonal !== null
         ? Number(item.id_oficina_zonal)
+        : item.ID_OFICINA_ZONAL !== undefined && item.ID_OFICINA_ZONAL !== null
+        ? Number(item.ID_OFICINA_ZONAL)
         : undefined,
     perfil: item.perfil ?? '',
     fechaInicio: item.fechaInicio ?? '',

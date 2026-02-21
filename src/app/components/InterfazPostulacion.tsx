@@ -5,6 +5,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { VistaPrevia } from './hoja-vida/VistaPrevia';
 import type { LoginResponse } from '../api/auth';
 import { fetchHojaVidaActual, fetchHojaVidaDatos, downloadDeclaracionesPdf } from '../api/hojaVida';
@@ -814,20 +815,30 @@ export function InterfazPostulacion({
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Relación</label>
-                <select
+                <Select
                   value={familiarDraft.relacion}
-                  onChange={(event) =>
-                    setFamiliarDraft((prev) => ({ ...prev, relacion: event.target.value }))
+                  onValueChange={(value) =>
+                    setFamiliarDraft((prev) => ({ ...prev, relacion: value }))
                   }
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                 >
-                  <option value="">Seleccione</option>
-                  {RELACIONES_NEPOTISMO.map((relacion) => (
-                    <option key={relacion} value={relacion}>
-                      {relacion}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
+                    <SelectValue placeholder="Seleccione" />
+                  </SelectTrigger>
+                  <SelectContent
+                    side="bottom"
+                    align="start"
+                    avoidCollisions={false}
+                    position="popper"
+                    sideOffset={4}
+                    className="max-h-64 overflow-y-auto"
+                  >
+                    {RELACIONES_NEPOTISMO.map((relacion) => (
+                      <SelectItem key={relacion} value={relacion}>
+                        {relacion}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Unidad en la que labora</label>

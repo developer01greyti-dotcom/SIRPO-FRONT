@@ -4,6 +4,8 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Input } from '../ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +18,12 @@ import {
 } from '../ui/alert-dialog';
 import { fetchAdminUsers, updateAdminUserStatus, upsertAdminUser } from '../../api/adminUsers';
 import type { AdminRole } from '../../utils/roles';
-import { fetchRolDropdown, type DropdownItem } from '../../api/catalogos';
+import {
+  fetchOficinaZonalList,
+  fetchRolDropdown,
+  type DropdownItem,
+  type OficinaZonalItem,
+} from '../../api/catalogos';
 
 const ROLE_OPTIONS: DropdownItem[] = [
   { id: 1, descripcion: 'Gestor de Convocatorias' },
@@ -36,6 +43,8 @@ interface UsuarioAdmin {
   estado: string;
   fechaCreacion: string;
   ultimoAcceso: string;
+  idOficinaZonal?: number | string;
+  oficinaZonal?: string;
 }
 
 interface GestionUsuariosAdminProps {
@@ -52,6 +61,9 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
   const [selectedUsuario, setSelectedUsuario] = useState<UsuarioAdmin | null>(null);
   const [rolOptions, setRolOptions] = useState<DropdownItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [oficinaZonalOptions, setOficinaZonalOptions] = useState<OficinaZonalItem[]>([]);
+  const [oficinaZonalQuery, setOficinaZonalQuery] = useState('');
+  const [isOficinaZonalLoading, setIsOficinaZonalLoading] = useState(false);
   const [confirmState, setConfirmState] = useState<{
     open: boolean;
     usuario: UsuarioAdmin | null;
@@ -63,6 +75,8 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
     email: '',
     rolId: '',
     estado: 'ACTIVO',
+    idOficinaZonal: '',
+    oficinaZonalLabel: '',
   });
 
   const loadUsuarios = useCallback(async () => {
@@ -177,7 +191,10 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
       email: '',
       rolId: '',
       estado: 'ACTIVO',
+      idOficinaZonal: '',
+      oficinaZonalLabel: '',
     });
+    setOficinaZonalQuery('');
     setShowForm(true);
   };
 
@@ -194,13 +211,20 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
       email: usuario.email,
       rolId: String(usuario.rolId ?? ''),
       estado: usuario.estado || 'ACTIVO',
+      idOficinaZonal: usuario.idOficinaZonal ? String(usuario.idOficinaZonal) : '',
+      oficinaZonalLabel: usuario.oficinaZonal ?? '',
     });
+    setOficinaZonalQuery(usuario.oficinaZonal ?? '');
     setShowForm(true);
   };
 
   const handleGuardar = async () => {
     if (!formData.usuarioAD || !formData.nombreCompleto || !formData.email || !formData.rolId) {
       alert('Por favor complete todos los campos obligatorios');
+      return;
+    }
+    if (isJefeRole && !formData.idOficinaZonal) {
+      alert('Seleccione la oficina zonal para el Jefe Zonal.');
       return;
     }
     if (adminRole === 'date') {
@@ -222,6 +246,7 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
         estado: formData.estado,
         estadoNuevo: getEstadoNuevoFromRolId(formData.rolId),
         usuarioAccion: adminUserId,
+        idOficinaZonal: isJefeRole ? Number(formData.idOficinaZonal || 0) : 0,
       });
 
       if (!ok) {
@@ -248,7 +273,10 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
       email: '',
       rolId: '',
       estado: 'ACTIVO',
+      idOficinaZonal: '',
+      oficinaZonalLabel: '',
     });
+    setOficinaZonalQuery('');
   };
 
   const handleCambiarEstado = (usuario: UsuarioAdmin) => {
@@ -310,6 +338,71 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
 
   const selectedRoleName =
     rolOptions.find((item) => String(item.id) === String(formData.rolId))?.descripcion || '';
+  const isJefeRole = getNormalizedRole(selectedRoleName, formData.rolId) === 'jefe';
+
+  const selectedZonalOption = oficinaZonalOptions.find(
+    (item) => String(item.idOficinaZonal) === String(formData.idOficinaZonal),
+  );
+  const resolvedZonalOptions =
+    !selectedZonalOption && formData.idOficinaZonal && formData.oficinaZonalLabel
+      ? [
+          {
+            idOficinaZonal: formData.idOficinaZonal,
+            oficinaZonal: formData.oficinaZonalLabel,
+          },
+          ...oficinaZonalOptions,
+        ]
+      : oficinaZonalOptions;
+
+  useEffect(() => {
+    if (!showForm || !isJefeRole) {
+      setOficinaZonalOptions([]);
+      setIsOficinaZonalLoading(false);
+      if (!isJefeRole) {
+        setOficinaZonalQuery('');
+        setFormData((prev) => ({ ...prev, idOficinaZonal: '', oficinaZonalLabel: '' }));
+      }
+      return;
+    }
+    const rawQuery = oficinaZonalQuery.trim();
+    const hasOzPrefix = /^oz\b/i.test(rawQuery);
+    const cleanedQuery = hasOzPrefix ? rawQuery.replace(/^oz\s*/i, '') : rawQuery;
+    const shouldFetchAll = hasOzPrefix && cleanedQuery.length === 0;
+    const minLength = hasOzPrefix ? 1 : 3;
+    if (!shouldFetchAll && cleanedQuery.length < minLength) {
+      setOficinaZonalOptions([]);
+      return;
+    }
+
+    let isActive = true;
+    setIsOficinaZonalLoading(true);
+    fetchOficinaZonalList(shouldFetchAll ? '' : cleanedQuery)
+      .then((items) => {
+        if (!isActive) return;
+        const map = new Map<string, OficinaZonalItem>();
+        (items || []).forEach((item) => {
+          const id = String(item.idOficinaZonal ?? '').trim();
+          const nombre = String(item.oficinaZonal ?? '').trim();
+          if (!id || !nombre) return;
+          if (!map.has(id)) {
+            map.set(id, { idOficinaZonal: id, oficinaZonal: nombre });
+          }
+        });
+        setOficinaZonalOptions(Array.from(map.values()));
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setOficinaZonalOptions([]);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setIsOficinaZonalLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [oficinaZonalQuery, isJefeRole, showForm]);
 
   const getEstadoNuevoFromRolId = (rolId: string | number) => {
     const match = rolOptions.find((item) => String(item.id) === String(rolId));
@@ -442,6 +535,100 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
                 </ul>
               </div>
             </div>
+
+            {isJefeRole && (
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Oficina Zonal *
+                </label>
+                <Select
+                  value={formData.idOficinaZonal}
+                  onValueChange={(value) => {
+                    const selected = resolvedZonalOptions.find(
+                      (item) => String(item.idOficinaZonal) === value,
+                    );
+                    setFormData((prev) => ({
+                      ...prev,
+                      idOficinaZonal: value,
+                      oficinaZonalLabel: selected?.oficinaZonal ?? prev.oficinaZonalLabel,
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Buscar oficina zonal" />
+                  </SelectTrigger>
+                  <SelectContent
+                    onOpenAutoFocus={(event) => event.preventDefault()}
+                    onCloseAutoFocus={(event) => event.preventDefault()}
+                  >
+                    <div className="p-2">
+                      <div className="flex gap-2">
+                        <Input
+                          type="text"
+                          placeholder="Escribe al menos 3 caracteres"
+                          value={oficinaZonalQuery}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setOficinaZonalQuery(value);
+                            if (formData.idOficinaZonal) {
+                              setFormData((prev) => ({
+                                ...prev,
+                                idOficinaZonal: '',
+                                oficinaZonalLabel: '',
+                              }));
+                            }
+                          }}
+                          autoFocus
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="w-[85%]"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-[15%]"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setOficinaZonalQuery('');
+                            setFormData((prev) => ({
+                              ...prev,
+                              idOficinaZonal: '',
+                              oficinaZonalLabel: '',
+                            }));
+                            setOficinaZonalOptions([]);
+                            const input = document.querySelector(
+                              'input[placeholder="Escribe al menos 3 caracteres"]',
+                            ) as HTMLInputElement | null;
+                            input?.focus();
+                          }}
+                        >
+                          Limpiar
+                        </Button>
+                      </div>
+                    </div>
+                    {oficinaZonalQuery.trim().length < 3 ? (
+                      <SelectItem value="min" disabled>
+                        Ingrese al menos 3 caracteres
+                      </SelectItem>
+                    ) : isOficinaZonalLoading ? (
+                      <SelectItem value="loading" disabled>
+                        Buscando...
+                      </SelectItem>
+                    ) : resolvedZonalOptions.length === 0 ? (
+                      <SelectItem value="empty" disabled>
+                        Sin resultados
+                      </SelectItem>
+                    ) : (
+                      resolvedZonalOptions.map((item) => (
+                        <SelectItem key={item.idOficinaZonal} value={String(item.idOficinaZonal)}>
+                          OZ {item.oficinaZonal}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
           </div>
 

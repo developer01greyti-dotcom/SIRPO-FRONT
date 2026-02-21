@@ -103,9 +103,24 @@ export const fetchConvocatoriasList = async (
     id: item.id,
     idConvocatoria: item.idConvocatoria ?? item.id_convocatoria ?? '',
     nombre: item.nombre,
-    oficinaCoordinacion: item.oficinaCoordinacion ?? '',
-    oficinaZonal: item.oficinaZonal ?? item.nombreOficinaZonal ?? item.nombre_zonal ?? '',
-    idOficinaZonal: item.idOficinaZonal ?? item.id_oficina_zonal ?? item.idZonal ?? '',
+    oficinaCoordinacion:
+      item.oficinaCoordinacion ?? item.OFICINA_COORDINACION ?? item.nombreOficinaCoordinacion ?? '',
+    oficinaZonal:
+      item.oficinaZonal ??
+      item.nombreOficinaZonal ??
+      item.nombre_zonal ??
+      item.OFICINA_ZONAL ??
+      item.NOMBRE_OFICINA_ZONAL ??
+      item.NOMBRE_ZONAL ??
+      '',
+    idOficinaZonal:
+      item.idOficinaZonal ??
+      item.id_oficina_zonal ??
+      item.ID_OFICINA_ZONAL ??
+      item.idZonal ??
+      item.ID_ZONAL ??
+      item.IDZONAL ??
+      '',
     perfil: item.perfil ?? '',
     fechaInicio: item.fechaInicio ?? '',
     fechaFin: item.fechaFin ?? '',
@@ -113,7 +128,7 @@ export const fetchConvocatoriasList = async (
     estado: item.estado ?? '',
     estadoId: item.estadoId ?? '',
     pdfUrl: item.pdfUrl ?? '',
-    idOficinaCoordinacion: item.idOficinaCoordinacion ?? '',
+    idOficinaCoordinacion: item.idOficinaCoordinacion ?? item.ID_OFICINA_COORDINACION ?? '',
     tipoContrato: item.tipoContrato ?? item.tipoCOntrato ?? '',
     numeroVacantes: item.numeroVacantes ?? 0,
     requisitosMinimos: item.requisitosMinimos ?? item.clob1 ?? '',

@@ -10,6 +10,8 @@ export interface AdminUserListItem {
   estado: string;
   fechaCreacion: string;
   ultimoAcceso: string;
+  idOficinaZonal?: number | string;
+  oficinaZonal?: string;
 }
 
 export interface AdminUserListFilters {
@@ -28,6 +30,7 @@ export interface AdminUserUpsertPayload {
   estado: string;
   estadoNuevo: number;
   usuarioAccion: number;
+  idOficinaZonal?: number | string;
 }
 
 export interface AdminUserStatusPayload {
@@ -51,7 +54,26 @@ export const fetchAdminUsers = async (
     },
   );
   const data = response.data;
-  return Array.isArray(data) ? data : data ? [data] : [];
+  const items = Array.isArray(data) ? data : data ? [data] : [];
+  return items.map((item: any) => ({
+    id: String(item.id ?? item.idAdmin ?? item.id_admin ?? ''),
+    usuarioAD: String(item.usuarioAD ?? item.usuario ?? item.user ?? ''),
+    nombreCompleto: String(item.nombreCompleto ?? item.nombre_completo ?? item.nombre ?? ''),
+    email: String(item.email ?? item.correo ?? item.mail ?? ''),
+    rol: String(item.rol ?? item.rolNombre ?? item.rol_nombre ?? ''),
+    rolId: item.rolId ?? item.idRol ?? item.id_rol ?? '',
+    estado: String(item.estado ?? item.estadoActual ?? item.estado_actual ?? ''),
+    fechaCreacion: String(item.fechaCreacion ?? item.fecha_creacion ?? ''),
+    ultimoAcceso: String(item.ultimoAcceso ?? item.ultimo_acceso ?? ''),
+    idOficinaZonal:
+      item.idOficinaZonal ?? item.id_oficina_zonal ?? item.ID_OFICINA_ZONAL ?? undefined,
+    oficinaZonal:
+      item.oficinaZonal ??
+      item.nombreOficinaZonal ??
+      item.nombre_zonal ??
+      item.OFICINA_ZONAL ??
+      '',
+  }));
 };
 
 export const upsertAdminUser = async (
@@ -67,6 +89,7 @@ export const upsertAdminUser = async (
       estado: payload.estado,
       estadoNuevo: payload.estadoNuevo,
       usuarioAccion: payload.usuarioAccion,
+      idOficinaZonal: payload.idOficinaZonal ?? 0,
     },
   });
   return Boolean(response.data);

@@ -3,7 +3,7 @@ import { Shield, Eye, EyeOff, LogIn } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { loginAdmin } from '../../api/adminAuth';
-import { mapTipoUsuarioToRole, type AdminRole } from '../../utils/roles';
+import { mapRolIdToRole, mapTipoUsuarioToRole, type AdminRole } from '../../utils/roles';
 
 interface AdminLoginProps {
   onLogin: (
@@ -44,10 +44,21 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
       }
 
       const roleFromTipo = mapTipoUsuarioToRole(result.tipoUsuario);
+      const roleFromRolId = mapRolIdToRole(result.rolId);
       const roleText = (result.rol || '').toLowerCase();
-      const normalizedRole =
-        roleFromTipo ??
-        (roleText.includes('super') || roleText.includes('admin') ? 'superadmin' : 'gestor');
+      const roleFromText =
+        roleText.includes('jefe') || roleText.includes('coordinador')
+          ? 'jefe'
+          : roleText.includes('date')
+          ? 'date'
+          : roleText.includes('uaba')
+          ? 'uaba'
+          : roleText.includes('gestor')
+          ? 'gestor'
+          : roleText.includes('super') || roleText.includes('admin')
+          ? 'superadmin'
+          : null;
+      const normalizedRole = roleFromTipo ?? roleFromRolId ?? roleFromText ?? 'gestor';
       const displayName = result.nombreCompleto || result.usuario || formData.usuario;
       onLogin(
         normalizedRole,

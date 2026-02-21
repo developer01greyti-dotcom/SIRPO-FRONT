@@ -79,6 +79,11 @@ export interface OficinaZonalCoordinacionItem {
   oficinaCoordinacion: string;
 }
 
+export interface OficinaZonalItem {
+  idOficinaZonal: number | string;
+  oficinaZonal: string;
+}
+
 export const fetchOficinaCoordinacionList = async (
   zonCord: string,
 ): Promise<OficinaZonalCoordinacionItem[]> => {
@@ -96,6 +101,21 @@ export const fetchOficinaCoordinacionList = async (
       item.idOficinaCoordinacion ?? item.idCoordinacion ?? item.id_coord ?? item.id ?? '',
     oficinaCoordinacion:
       item.oficinaCoordinacion ?? item.coordinacion ?? item.nombre ?? item.descripcion ?? '',
+  }));
+};
+
+export const fetchOficinaZonalList = async (
+  zonal: string,
+): Promise<OficinaZonalItem[]> => {
+  const response = await apiClient.post<OficinaZonalItem[] | DropdownItem[]>(
+    '/ofzonal/list',
+    { estructura: { zonal } },
+  );
+  const data = response.data || [];
+  return (Array.isArray(data) ? data : [data]).map((item: any) => ({
+    idOficinaZonal:
+      item.idOficinaZonal ?? item.id_oficina_zonal ?? item.ID_OFICINA_ZONAL ?? item.id ?? '',
+    oficinaZonal: item.oficinaZonal ?? item.nombre ?? item.nombreZonal ?? item.OFICINA_ZONAL ?? '',
   }));
 };
 

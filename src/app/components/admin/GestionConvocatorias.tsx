@@ -80,12 +80,17 @@ export function GestionConvocatorias({
 
   const normalizeOz = (value?: string) => (value || '').trim().toUpperCase();
   const matchesAdminOz = (item: ConvocatoriaAdmin) => {
-    if (!adminOficinaZonalId && !adminOficinaZonal) return true;
-    if (adminOficinaZonalId && String(item.idOficinaZonal ?? '') === String(adminOficinaZonalId)) {
+    if (!adminOficinaZonalId && !adminOficinaZonal) {
+      return adminRole === 'jefe' ? false : true;
+    }
+    if (
+      adminOficinaZonalId &&
+      String(item.idOficinaZonal ?? item.ID_OFICINA_ZONAL ?? '') === String(adminOficinaZonalId)
+    ) {
       return true;
     }
     if (adminOficinaZonal) {
-      return normalizeOz(item.oficinaZonal ?? '') === normalizeOz(adminOficinaZonal);
+      return normalizeOz(item.oficinaZonal ?? item.OFICINA_ZONAL ?? '') === normalizeOz(adminOficinaZonal);
     }
     return false;
   };
