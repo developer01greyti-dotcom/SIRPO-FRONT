@@ -1731,6 +1731,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 value={formData.ruc}
 
                 onChange={(e) => updateField('ruc', e.target.value)}
+                readOnly
 
               />
 

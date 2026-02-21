@@ -43,7 +43,7 @@ interface ConvocatoriasTableProps {
 export function ConvocatoriasTable({
   convocatorias,
   onPostular,
-  hojaVidaCompleta = false,
+  hojaVidaCompleta: _hojaVidaCompleta = false,
   getRegistroBloqueo,
 }: ConvocatoriasTableProps) { 
   const getEstadoBadge = (estado: string) => {
@@ -204,7 +204,6 @@ export function ConvocatoriasTable({
                           const registroHabilitado =
                             isPublicado(conv) &&
                             isWithinRange(conv.fechaInicio, conv.fechaFin) &&
-                            hojaVidaCompleta &&
                             !bloqueo.blocked;
 
                           if (registroHabilitado) {
@@ -223,8 +222,6 @@ export function ConvocatoriasTable({
                           const mensaje =
                             bloqueo.blocked && bloqueo.reason
                               ? bloqueo.reason
-                              : !hojaVidaCompleta
-                              ? 'Completa tu Hoja de Vida para registrarte'
                               : !isPublicado(conv)
                               ? 'Este servicio está inactivo'
                               : 'Este servicio está fuera de vigencia';

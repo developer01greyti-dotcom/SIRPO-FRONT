@@ -108,3 +108,8 @@ export const loginPostulante = async (
   const token = extractToken(response.data);
   return token ? { ...normalized, token } : normalized;
 };
+
+export const requestPasswordRecovery = async (email: string): Promise<boolean> => {
+  const response = await apiClient.post('/usrpost_recovery', { email });
+  return response.status >= 200 && response.status < 300;
+};

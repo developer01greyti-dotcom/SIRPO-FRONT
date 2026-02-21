@@ -81,6 +81,7 @@ const isAuthEndpoint = (url?: string) => {
   return (
     url.includes('/usrpost_login') ||
     url.includes('/usrpost_reg') ||
+    url.includes('/usrpost_recovery') ||
     url.includes('/admLogin') ||
     url.includes('/adm_login')
   );

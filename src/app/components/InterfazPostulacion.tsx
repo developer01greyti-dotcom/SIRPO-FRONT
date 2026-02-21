@@ -96,6 +96,28 @@ interface InterfazPostulacionProps {
   isSubmitting?: boolean;
 }
 
+const RELACIONES_NEPOTISMO = [
+  'Padre',
+  'Madre',
+  'Hijo/a',
+  'Hermano/a',
+  'Abuelo/a',
+  'Nieto/a',
+  'Tío/a',
+  'Sobrino/a',
+  'Bisabuelo/a',
+  'Bisnieto/a',
+  'Primo/a (hermano/a)',
+  'Tío/a abuelo/a',
+  'Sobrino/a nieto/a',
+  'Suegro/a',
+  'Yerno/Nuera',
+  'Hijastro/a (si aplica)',
+  'Cuñado/a',
+  'Cónyuge',
+  'Conviviente (unión de hecho)',
+];
+
 export function InterfazPostulacion({
   convocatoria,
   formaciones,
@@ -792,14 +814,20 @@ export function InterfazPostulacion({
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Relación</label>
-                <input
-                  type="text"
+                <select
                   value={familiarDraft.relacion}
                   onChange={(event) =>
                     setFamiliarDraft((prev) => ({ ...prev, relacion: event.target.value }))
                   }
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                />
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Seleccione</option>
+                  {RELACIONES_NEPOTISMO.map((relacion) => (
+                    <option key={relacion} value={relacion}>
+                      {relacion}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Unidad en la que labora</label>

@@ -634,6 +634,7 @@ export function RegisterForm({ onRegister, onNavigateToLogin }: RegisterFormProp
                         setIsRucLocked(false);
                       }
                     }}
+                    readOnly={isRucLocked}
                   />
                 </div>
                 <Button

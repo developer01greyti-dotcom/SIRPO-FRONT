@@ -5,6 +5,7 @@ import { Label } from '../ui/label';
 import { useState } from 'react';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import devidaLogo from '../../../images/devida-logo.png';
+import { requestPasswordRecovery } from '../../api/auth';
 
 interface RecoveryFormProps {
   onNavigateToLogin: () => void;
@@ -12,10 +13,32 @@ interface RecoveryFormProps {
 
 export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
   const [submitted, setSubmitted] = useState(false);
+  const [email, setEmail] = useState('');
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (isSubmitting) return;
+    setFormError('');
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setFormError('Ingrese su correo electrónico.');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      const ok = await requestPasswordRecovery(trimmed);
+      if (!ok) {
+        setFormError('No se pudo enviar el correo de recuperación.');
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setFormError('No se pudo enviar el correo de recuperación.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -78,6 +101,11 @@ export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
         {/* Recovery Card */}
         <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {formError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {formError}
+              </div>
+            )}
             {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email">Correo electrónico</Label>
@@ -88,6 +116,8 @@ export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
                   type="email"
                   placeholder="correo@ejemplo.com"
                   className="pl-10"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
@@ -101,9 +131,13 @@ export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
             </div>
 
             {/* Submit Button */}
-            <Button type="submit" className="w-full gap-2 bg-green-600 hover:bg-green-700">
+            <Button
+              type="submit"
+              className="w-full gap-2 bg-green-600 hover:bg-green-700"
+              disabled={isSubmitting}
+            >
               <Send className="w-4 h-4" />
-              Enviar instrucciones
+              {isSubmitting ? 'Enviando...' : 'Enviar instrucciones'}
             </Button>
           </form>
         </div>

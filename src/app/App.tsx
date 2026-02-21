@@ -818,23 +818,17 @@ export default function App() {
     await loadConvocatorias();
   };
 
-  const handlePostular = async (convocatoria: Convocatoria) => {
-    const data = await loadPostulaciones();
-    const bloqueo = getBloqueoConvocatoria(convocatoria, data);
-    if (bloqueo.blocked) {
-      alert(bloqueo.reason || 'No puedes registrarte en este servicio.');
-      return;
-    }
-    setSelectedConvocatoria(convocatoria);
-    
-    // Si la hoja de vida está completa, mostrar modal de confirmación
-    if (hojaVidaCompleta) {
+    const handlePostular = async (convocatoria: Convocatoria) => {
+      const data = await loadPostulaciones();
+      const bloqueo = getBloqueoConvocatoria(convocatoria, data);
+      if (bloqueo.blocked) {
+        alert(bloqueo.reason || 'No puedes registrarte en este servicio.');
+        return;
+      }
+      setSelectedConvocatoria(convocatoria);
+      setModalOpen(false);
       setShowConfirmacionModal(true);
-    } else {
-      // Si no está completa, mostrar el modal anterior
-      setModalOpen(true);
-    }
-  };
+    };
 
   const handleGoToHojaVida = () => {
     setModalOpen(false);
