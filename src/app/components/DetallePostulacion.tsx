@@ -1,11 +1,15 @@
-import { X, Calendar, MapPin, Briefcase, Building2, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Calendar, MapPin, Briefcase, Building2, Clock, Download } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { VistaPrevia } from './hoja-vida/VistaPrevia';
+import { downloadHojaVidaPdf, fetchHojaVidaActual } from '../api/hojaVida';
+import type { LoginResponse } from '../api/auth';
 
 interface Postulacion {
   id: string;
+  idHojaVida?: number;
   convocatoria: string;
   oficinaZonal: string;
   oficinaCoordinacion: string;
@@ -63,6 +67,7 @@ interface Declaracion {
 }
 
 interface DetallePostulacionProps {
+  user?: LoginResponse | null;
   postulacion: Postulacion;
   formaciones: Formacion[];
   cursos: Curso[];
@@ -72,6 +77,7 @@ interface DetallePostulacionProps {
 }
 
 export function DetallePostulacion({
+  user,
   postulacion,
   formaciones,
   cursos,
@@ -79,6 +85,10 @@ export function DetallePostulacion({
   declaraciones = [],
   onClose,
 }: DetallePostulacionProps) {
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [hojaVidaId, setHojaVidaId] = useState<number>(Number(postulacion.idHojaVida ?? 0));
+
   const normalizeEstado = (estado: string) => {
     const normalized = (estado || '').toLowerCase().trim();
     if (normalized === '1') return 'en revision';
@@ -93,6 +103,58 @@ export function DetallePostulacion({
     if (compact.includes('registr')) return 'registrado';
     if (compact.includes('revision')) return 'en revision';
     return normalized;
+  };
+
+  useEffect(() => {
+    let isActive = true;
+    if (postulacion.idHojaVida) {
+      setHojaVidaId(Number(postulacion.idHojaVida));
+      return;
+    }
+    if (!user?.idPersona || !user?.idUsuario) {
+      return;
+    }
+    fetchHojaVidaActual(user.idPersona, user.idUsuario)
+      .then((hv) => {
+        if (!isActive) return;
+        setHojaVidaId(Number(hv?.idHojaVida ?? 0));
+      })
+      .catch(() => {
+        // ignore
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [postulacion.idHojaVida, user?.idPersona, user?.idUsuario]);
+
+  const handleDescargarPdf = async () => {
+    if (!hojaVidaId) {
+      setDownloadError('No se encontró la Hoja de Vida para descargar.');
+      return;
+    }
+    if (isDownloadingPdf) {
+      return;
+    }
+    setDownloadError(null);
+    setIsDownloadingPdf(true);
+    try {
+      const blob = await downloadHojaVidaPdf(Number(hojaVidaId));
+      if (!blob || blob.size === 0) {
+        setDownloadError('No se pudo generar el PDF.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const filename = `hoja_vida_${hojaVidaId}.pdf`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setDownloadError('No se pudo descargar el PDF.');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   const getEstadoBadge = (estado: string) => {
@@ -223,13 +285,29 @@ export function DetallePostulacion({
 
       {/* Información de la Hoja de Vida Enviada */}
       <div>
-        <div className="mb-4">
-          <h3 className="text-xl font-bold" style={{ color: '#108cc9' }}>
-            Hoja de Vida Enviada
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Esta es la información que fue enviada con tu postulación
-          </p>
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-xl font-bold" style={{ color: '#108cc9' }}>
+              Hoja de Vida Enviada
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Esta es la información que fue enviada con tu postulación
+            </p>
+          </div>
+          <div className="flex flex-col items-start md:items-end gap-1">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handleDescargarPdf}
+              disabled={isDownloadingPdf}
+            >
+              <Download className="w-4 h-4" />
+              {isDownloadingPdf ? 'Descargando...' : 'Descargar PDF'}
+            </Button>
+            {downloadError && (
+              <p className="text-xs text-red-600">{downloadError}</p>
+            )}
+          </div>
         </div>
         
         <VistaPrevia

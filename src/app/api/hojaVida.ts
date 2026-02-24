@@ -356,7 +356,7 @@ export const downloadHojaVidaPdf = async (idHojaVida: number): Promise<Blob> => 
     params: { idHojaVida },
     responseType: 'blob',
     headers: {
-      Accept: 'application/pdf',
+      Accept: 'application/pdf, application/octet-stream, */*',
     },
   });
   return response.data as Blob;
@@ -427,7 +427,7 @@ export const downloadDeclaracionesPdf = async (
     params,
     responseType: 'blob',
     headers: {
-      Accept: 'application/pdf',
+      Accept: 'application/pdf, application/octet-stream, */*',
       'Cache-Control': 'no-cache',
     },
   });

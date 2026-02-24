@@ -278,6 +278,9 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
   }, [user]);
 
+  const isDocumentoLocked = Boolean(user?.numeroDocumento || formData.numeroDocumento);
+  const isCorreoLocked = Boolean(user?.email || formData.correo);
+
   const isDniSelected = useMemo(() => {
     const selected = tipoDocumentoOptions.find(
       (item) => String(item.id) === String(formData.tipoDocumento),
@@ -1333,10 +1336,15 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 onValueChange={(value) => updateField('tipoDocumento', value)}
 
                 required
+                disabled={isDocumentoLocked}
 
               >
 
-                <SelectTrigger id="tipoDocumento">
+                <SelectTrigger
+                  id="tipoDocumento"
+                  disabled={isDocumentoLocked}
+                  className={isDocumentoLocked ? 'bg-gray-50' : undefined}
+                >
 
                   <SelectValue placeholder="Seleccionar..." />
 
@@ -1612,7 +1620,6 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 lang="es-PE"
                 value={formData.fechaNacimiento}
                 onChange={(e) => updateField('fechaNacimiento', e.target.value)}
-                readOnly
                 required
               />
 
@@ -1666,11 +1673,12 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
                   placeholder=""
 
-                  className="pl-10"
+                  className={`pl-10${isCorreoLocked ? ' bg-gray-50' : ''}`}
 
                   value={formData.correo}
 
                   onChange={(e) => updateField('correo', e.target.value)}
+                  readOnly={isCorreoLocked}
 
                   required
 

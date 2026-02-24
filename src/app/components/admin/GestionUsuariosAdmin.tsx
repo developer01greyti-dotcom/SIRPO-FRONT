@@ -64,6 +64,7 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
   const [oficinaZonalOptions, setOficinaZonalOptions] = useState<OficinaZonalItem[]>([]);
   const [oficinaZonalQuery, setOficinaZonalQuery] = useState('');
   const [isOficinaZonalLoading, setIsOficinaZonalLoading] = useState(false);
+  const [oficinaZonalLookup, setOficinaZonalLookup] = useState<Record<string, string>>({});
   const [confirmState, setConfirmState] = useState<{
     open: boolean;
     usuario: UsuarioAdmin | null;
@@ -79,19 +80,78 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
     oficinaZonalLabel: '',
   });
 
+
+  const buildOficinaZonalLookup = (items: OficinaZonalItem[]) => {
+    const lookup: Record<string, string> = {};
+    (items || []).forEach((item) => {
+      const id = String(item.idOficinaZonal ?? '').trim();
+      const nombre = String(item.oficinaZonal ?? '').trim();
+      if (!id || !nombre) return;
+      if (!lookup[id]) {
+        lookup[id] = nombre;
+      }
+    });
+    return lookup;
+  };
+
+  const applyOficinaZonalLookup = (
+    users: UsuarioAdmin[],
+    lookup: Record<string, string>,
+  ) =>
+    users.map((user) => {
+      if (user.oficinaZonal && String(user.oficinaZonal).trim()) {
+        return user;
+      }
+      const id = String(user.idOficinaZonal ?? '').trim();
+      if (!id || !lookup[id]) {
+        return user;
+      }
+      return { ...user, oficinaZonal: lookup[id] };
+    });
+
+  const shouldFetchOficinaZonal = (
+    users: UsuarioAdmin[],
+    lookup: Record<string, string>,
+  ) =>
+    users.some((user) => {
+      const id = String(user.idOficinaZonal ?? '').trim();
+      return !!id && (!user.oficinaZonal || !String(user.oficinaZonal).trim()) && !lookup[id];
+    });
+
+  const resolveUsuariosWithOficinaZonal = useCallback(
+    async (users: UsuarioAdmin[]) => {
+      if (!shouldFetchOficinaZonal(users, oficinaZonalLookup)) {
+        return applyOficinaZonalLookup(users, oficinaZonalLookup);
+      }
+      try {
+        const items = await fetchOficinaZonalList('');
+        const lookup = {
+          ...oficinaZonalLookup,
+          ...buildOficinaZonalLookup(items),
+        };
+        setOficinaZonalLookup(lookup);
+        return applyOficinaZonalLookup(users, lookup);
+      } catch (error) {
+        return applyOficinaZonalLookup(users, oficinaZonalLookup);
+      }
+    },
+    [oficinaZonalLookup],
+  );
+
   const loadUsuarios = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
       const data = await fetchAdminUsers();
-      setUsuarios(data);
+      const resolved = await resolveUsuariosWithOficinaZonal(data);
+      setUsuarios(resolved);
     } catch (error) {
       setUsuarios([]);
       setLoadError('No se pudo cargar el listado de usuarios.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [resolveUsuariosWithOficinaZonal]);
 
   const normalizeRoleLabel = (label: string) =>
     (label || '')
@@ -125,7 +185,8 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
       try {
         const [users, roles] = await Promise.all([fetchAdminUsers(), fetchRolDropdown()]);
         if (!isActive) return;
-        setUsuarios(users);
+        const resolved = await resolveUsuariosWithOficinaZonal(users);
+        setUsuarios(resolved);
         const sourceRoles = roles && roles.length > 0 ? roles : ROLE_OPTIONS;
         setRolOptions(filterRoleOptions(sourceRoles));
       } catch (error) {
@@ -145,7 +206,7 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
     return () => {
       isActive = false;
     };
-  }, [filterRoleOptions]);
+  }, [filterRoleOptions, resolveUsuariosWithOficinaZonal]);
 
   const getNormalizedRole = (rol: string, rolId?: string | number) => {
     const rolText = (rol || '').toLowerCase();
@@ -706,6 +767,7 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
                   <TableHead className="font-semibold">Usuario AD</TableHead>
                   <TableHead className="font-semibold">Nombre Completo</TableHead>
                   <TableHead className="font-semibold">Email</TableHead>
+                  <TableHead className="font-semibold">Oficina Zonal</TableHead>
                   <TableHead className="font-semibold">Rol</TableHead>
                   <TableHead className="font-semibold">Estado</TableHead>
                   <TableHead className="font-semibold">Último Acceso</TableHead>
@@ -715,19 +777,19 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-gray-500 py-6">
+                    <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-6">
                       Cargando usuarios...
                     </TableCell>
                   </TableRow>
                 ) : loadError ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-red-600 py-6">
+                    <TableCell colSpan={8} className="text-center text-sm text-red-600 py-6">
                       {loadError}
                     </TableCell>
                   </TableRow>
                 ) : usuarios.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-gray-500 py-6">
+                    <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-6">
                       No se encontraron usuarios.
                     </TableCell>
                   </TableRow>
@@ -740,6 +802,9 @@ export function GestionUsuariosAdmin({ adminUserId = 0, adminRole }: GestionUsua
                       <TableCell className="font-medium">{usuario.usuarioAD}</TableCell>
                       <TableCell>{usuario.nombreCompleto}</TableCell>
                       <TableCell className="text-sm text-gray-600">{usuario.email}</TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {usuario.oficinaZonal ? `OZ ${usuario.oficinaZonal}` : '-'}
+                      </TableCell>
                       <TableCell>{getRolBadge(usuario.rol, usuario.rolId)}</TableCell>
                       <TableCell>{getEstadoBadge(usuario.estado)}</TableCell>
                       <TableCell className="text-sm text-gray-600">{usuario.ultimoAcceso}</TableCell>

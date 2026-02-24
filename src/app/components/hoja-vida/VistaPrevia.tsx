@@ -659,6 +659,10 @@ export function VistaPrevia({
       setCompletionError('No se encontr\u00f3 la Hoja de Vida.'); 
       return; 
     } 
+    if (formaciones.length === 0 || experiencias.length === 0) {
+      setCompletionError('Debes registrar al menos una formación académica y una experiencia profesional.');
+      return;
+    }
     setIsCompleting(true); 
     setCompletionMessage(null); 
     setCompletionError(null); 

@@ -33,7 +33,14 @@ import { DeclaracionesJuradasAdmin } from './components/admin/DeclaracionesJurad
 import { GestionUsuariosAdmin } from './components/admin/GestionUsuariosAdmin';
 import type { LoginResponse } from './api/auth';
 import { fetchConvocatoriasList } from './api/convocatorias';
-import { attachDeclaracionesPdf, downloadDeclaracionesPdf, fetchHojaVidaActual, fetchHojaVidaDatos } from './api/hojaVida';
+import {
+  attachDeclaracionesPdf,
+  downloadDeclaracionesPdf,
+  fetchHojaVidaActual,
+  fetchHojaVidaDatos,
+  fetchHvExpList,
+  fetchHvFormList,
+} from './api/hojaVida';
 import { fetchPostulacionesByPersona, upsertPostulacion, type PostulacionListItem } from './api/postulaciones';
 import { mapTipoUsuarioToRole, type AdminRole } from './utils/roles';
 
@@ -794,11 +801,29 @@ export default function App() {
         return; 
       } 
       try { 
-        const hvActual = await fetchHojaVidaActual(postulanteUser.idPersona, postulanteUser.idUsuario); 
-        const estado = hvActual?.estado ?? ''; 
-        setHojaVidaEstado(estado); 
-        setHojaVidaCompleta((estado || '').toUpperCase() === 'COMPLETO'); 
-        setHojaVidaId(Number(hvActual?.idHojaVida ?? 0));
+        const hvActual = await fetchHojaVidaActual(postulanteUser.idPersona, postulanteUser.idUsuario);
+        const estado = hvActual?.estado ?? '';
+        const hojaVidaId = Number(hvActual?.idHojaVida ?? 0);
+        let hasFormacion = false;
+        let hasExperiencia = false;
+        if (hojaVidaId > 0) {
+          try {
+            const [formacionesData, experienciasData] = await Promise.all([
+              fetchHvFormList(hojaVidaId),
+              fetchHvExpList(hojaVidaId),
+            ]);
+            hasFormacion = Array.isArray(formacionesData) && formacionesData.length > 0;
+            hasExperiencia = Array.isArray(experienciasData) && experienciasData.length > 0;
+          } catch {
+            hasFormacion = false;
+            hasExperiencia = false;
+          }
+        }
+        setHojaVidaEstado(estado);
+        setHojaVidaCompleta(
+          (estado || '').toUpperCase() === 'COMPLETO' && hasFormacion && hasExperiencia,
+        );
+        setHojaVidaId(hojaVidaId);
       } catch { 
         setHojaVidaEstado(''); 
         setHojaVidaCompleta(false); 
@@ -1369,6 +1394,7 @@ export default function App() {
           <div className="max-w-[1600px] mx-auto">
             {showDetallePostulacion && selectedPostulacion ? (
               <DetallePostulacion
+                user={postulanteUser}
                 postulacion={selectedPostulacion}
                 formaciones={[
                   {

@@ -60,7 +60,7 @@ export const canDeleteServicios = (role?: AdminRole | null) =>
   role === 'superadmin' || role === 'date';
 
 export const canEvaluatePostulaciones = (role?: AdminRole | null) =>
-  role === 'superadmin' || role === 'date' || role === 'jefe';
+  role === 'superadmin' || role === 'jefe';
 
 export const isCumpleOnlyRole = (role?: AdminRole | null) =>
   role === 'uaba';
