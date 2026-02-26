@@ -1,5 +1,5 @@
 ﻿import { Filter, GraduationCap, Briefcase, Eye, Send, ChevronLeft, ChevronRight, Save, FileText, User, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
@@ -795,43 +795,44 @@ export default function App() {
     }
   }, [isAuthenticated, userType, postulanteUser?.idPersona]);
 
-  useEffect(() => { 
-    const loadHojaVidaEstado = async () => { 
-      if (!isAuthenticated || userType !== 'postulante' || !postulanteUser?.idPersona || !postulanteUser?.idUsuario) { 
-        return; 
-      } 
-      try { 
-        const hvActual = await fetchHojaVidaActual(postulanteUser.idPersona, postulanteUser.idUsuario);
-        const estado = hvActual?.estado ?? '';
-        const hojaVidaId = Number(hvActual?.idHojaVida ?? 0);
-        let hasFormacion = false;
-        let hasExperiencia = false;
-        if (hojaVidaId > 0) {
-          try {
-            const [formacionesData, experienciasData] = await Promise.all([
-              fetchHvFormList(hojaVidaId),
-              fetchHvExpList(hojaVidaId),
-            ]);
-            hasFormacion = Array.isArray(formacionesData) && formacionesData.length > 0;
-            hasExperiencia = Array.isArray(experienciasData) && experienciasData.length > 0;
-          } catch {
-            hasFormacion = false;
-            hasExperiencia = false;
-          }
+  const refreshHojaVidaEstado = useCallback(async () => {
+    if (!isAuthenticated || userType !== 'postulante' || !postulanteUser?.idPersona || !postulanteUser?.idUsuario) {
+      return;
+    }
+    try {
+      const hvActual = await fetchHojaVidaActual(postulanteUser.idPersona, postulanteUser.idUsuario);
+      const estado = hvActual?.estado ?? '';
+      const hojaVidaId = Number(hvActual?.idHojaVida ?? 0);
+      let hasFormacion = false;
+      let hasExperiencia = false;
+      if (hojaVidaId > 0) {
+        try {
+          const [formacionesData, experienciasData] = await Promise.all([
+            fetchHvFormList(hojaVidaId),
+            fetchHvExpList(hojaVidaId),
+          ]);
+          hasFormacion = Array.isArray(formacionesData) && formacionesData.length > 0;
+          hasExperiencia = Array.isArray(experienciasData) && experienciasData.length > 0;
+        } catch {
+          hasFormacion = false;
+          hasExperiencia = false;
         }
-        setHojaVidaEstado(estado);
-        setHojaVidaCompleta(
-          (estado || '').toUpperCase() === 'COMPLETO' && hasFormacion && hasExperiencia,
-        );
-        setHojaVidaId(hojaVidaId);
-      } catch { 
-        setHojaVidaEstado(''); 
-        setHojaVidaCompleta(false); 
-        setHojaVidaId(0);
-      } 
-    }; 
-    loadHojaVidaEstado(); 
-  }, [isAuthenticated, userType, postulanteUser]); 
+      }
+      setHojaVidaEstado(estado);
+      setHojaVidaCompleta(
+        (estado || '').toUpperCase() === 'COMPLETO' && hasFormacion && hasExperiencia,
+      );
+      setHojaVidaId(hojaVidaId);
+    } catch {
+      setHojaVidaEstado('');
+      setHojaVidaCompleta(false);
+      setHojaVidaId(0);
+    }
+  }, [isAuthenticated, postulanteUser?.idPersona, postulanteUser?.idUsuario, userType]);
+
+  useEffect(() => {
+    refreshHojaVidaEstado();
+  }, [refreshHojaVidaEstado]);
 
   useEffect(() => {
     if (!registroPopup) {
@@ -852,17 +853,21 @@ export default function App() {
     await loadConvocatorias();
   };
 
-    const handlePostular = async (convocatoria: Convocatoria) => {
-      const data = await loadPostulaciones();
-      const bloqueo = getBloqueoConvocatoria(convocatoria, data);
-      if (bloqueo.blocked) {
-        alert(bloqueo.reason || 'No puedes registrarte en este servicio.');
-        return;
-      }
-      setSelectedConvocatoria(convocatoria);
-      setModalOpen(false);
-      setShowConfirmacionModal(true);
-    };
+  const handlePostular = async (convocatoria: Convocatoria) => {
+    const data = await loadPostulaciones();
+    const bloqueo = getBloqueoConvocatoria(convocatoria, data);
+    if (bloqueo.blocked) {
+      alert(bloqueo.reason || 'No puedes registrarte en este servicio.');
+      return;
+    }
+    setSelectedConvocatoria(convocatoria);
+    if (!hojaVidaCompleta) {
+      setModalOpen(true);
+      return;
+    }
+    setModalOpen(false);
+    setShowConfirmacionModal(true);
+  };
 
   const handleGoToHojaVida = () => {
     setModalOpen(false);
@@ -872,6 +877,11 @@ export default function App() {
   };
 
   const handleConfirmarPostulacion = () => { 
+    if (!hojaVidaCompleta) {
+      setShowConfirmacionModal(false);
+      setModalOpen(true);
+      return;
+    }
     // Cerrar modal de confirmación y cambiar a la sección de postulación 
     setShowConfirmacionModal(false); 
     setActiveSection('postulacion'); 
@@ -949,6 +959,13 @@ export default function App() {
 
   const handleCompletarPostulacion = async (payload: CompletarPostulacionPayload = {}) => {
     if (isSubmittingPostulacion) {
+      return;
+    }
+    if (!hojaVidaCompleta) {
+      alert('Para registrarte debes completar y bloquear tu Hoja de Vida.');
+      setActiveSection('hoja-vida');
+      setActiveTab('vista-previa');
+      navigate('/hojaVida');
       return;
     }
     if (!selectedConvocatoria || !postulanteUser) {
@@ -1036,6 +1053,7 @@ export default function App() {
   };
 
   const postulacionesResumen = buildPostulacionesResumen(postulaciones);
+  const isHojaVidaLocked = (hojaVidaEstado || '').toUpperCase() === 'COMPLETO';
 
   if (typeof window !== 'undefined') {
     (window as any).postulacionesResumen = {
@@ -1313,19 +1331,24 @@ export default function App() {
               </TabsList>
 
               <TabsContent value="datos-personales" className="space-y-6">
-                <DatosPersonales user={postulanteUser} />
+                <DatosPersonales user={postulanteUser} isLocked={isHojaVidaLocked} />
               </TabsContent>
 
               <TabsContent value="formacion" className="space-y-6">
-                <FormacionAcademica user={postulanteUser} />
+                <FormacionAcademica user={postulanteUser} isLocked={isHojaVidaLocked} />
               </TabsContent>
 
               <TabsContent value="experiencia" className="space-y-6">
-                <ExperienciaProfesional user={postulanteUser} />
+                <ExperienciaProfesional user={postulanteUser} isLocked={isHojaVidaLocked} />
               </TabsContent>
 
               <TabsContent value="vista-previa" className="space-y-6">
-                <VistaPrevia user={postulanteUser} />
+                <VistaPrevia
+                  user={postulanteUser}
+                  onEstadoChange={() => {
+                    void refreshHojaVidaEstado();
+                  }}
+                />
               </TabsContent>
             </Tabs>
 

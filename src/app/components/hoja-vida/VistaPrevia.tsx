@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { User, MapPin, FileText, GraduationCap, Briefcase, Download, Eye, Phone, Mail, Calendar, Building2, Award, Home, CreditCard, Shield, CheckCircle2 } from 'lucide-react';
+import { User, MapPin, FileText, GraduationCap, Briefcase, Download, Eye, Phone, Mail, Calendar, Building2, Award, Home, CreditCard, Shield, CheckCircle2, Edit3 } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
@@ -100,6 +100,7 @@ interface VistaPreviaProps {
   declaraciones?: Declaracion[];
   hideHeader?: boolean;
   showDeclaraciones?: boolean;
+  onEstadoChange?: (estado: string) => void;
 }
 
 export function VistaPrevia({
@@ -111,6 +112,7 @@ export function VistaPrevia({
   declaraciones: declaracionesProp,
   hideHeader,
   showDeclaraciones = false,
+  onEstadoChange,
 }: VistaPreviaProps) {
   const [datosPersonalesState, setDatosPersonalesState] = useState<DatosPersonalesData | null>(null);
   const [formacionesState, setFormacionesState] = useState<Formacion[]>([]);
@@ -120,6 +122,7 @@ export function VistaPrevia({
   const [isLoading, setIsLoading] = useState(false); 
   const [hojaVidaActual, setHojaVidaActual] = useState<HojaVidaActual | null>(null); 
   const [isCompleting, setIsCompleting] = useState(false); 
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null); 
   const [completionError, setCompletionError] = useState<string | null>(null); 
   const [loadError, setLoadError] = useState<string | null>(null); 
@@ -495,6 +498,12 @@ export function VistaPrevia({
                     <p className="text-sm font-medium text-gray-900">{getTipoExperienciaLabel(exp.tipoExperiencia)}</p>
                   </div>
                   <div className="space-y-1">
+                    <p className="text-xs text-gray-500">Específica</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {exp.experienciaEspecifica ? 'Sí' : 'No'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
                     <p className="text-xs text-gray-500">Tipo de Entidad</p>
                     <p className="text-sm font-medium text-gray-900">{getTipoEntidadLabel(exp.tipoEntidad)}</p>
                   </div>
@@ -628,9 +637,8 @@ export function VistaPrevia({
     return { years, months, days, totalDays };
   };
   const experienciasEspecificas = experiencias.filter((exp) => exp.experienciaEspecifica);
-  const experienciasGenerales = experiencias.filter((exp) => !exp.experienciaEspecifica);
-  const totalExperienciaGeneral = calcularTotalExperiencia(experienciasGenerales);
   const totalExperienciaEspecifica = calcularTotalExperiencia(experienciasEspecificas);
+  const totalExperienciaTotal = calcularTotalExperiencia(experiencias);
   const hasPersonalData = Boolean(
     datosPersonales.nombres ||
       datosPersonales.apellidoPaterno ||
@@ -648,7 +656,9 @@ export function VistaPrevia({
   const canDownload = hasContent && !loadError;
 
   const nombreCompleto = `${datosPersonales.nombres} ${datosPersonales.apellidoPaterno} ${datosPersonales.apellidoMaterno}`.trim(); 
-  const isHojaVidaCompleta = hojaVidaActual?.estado?.toUpperCase() === 'COMPLETO'; 
+  const ESTADO_COMPLETO = 'COMPLETO';
+  const ESTADO_EDICION = 'EN_EDICION';
+  const isHojaVidaCompleta = hojaVidaActual?.estado?.toUpperCase() === ESTADO_COMPLETO; 
 
   const handleCompletarHojaVida = async () => { 
     if (!user?.idUsuario) { 
@@ -671,12 +681,13 @@ export function VistaPrevia({
         idHojaVida: hojaVidaActual.idHojaVida, 
         idPersona: user?.idPersona ?? 0, 
         version: hojaVidaActual.version ?? 0, 
-        estado: 'COMPLETO', 
+        estado: ESTADO_COMPLETO, 
         usuarioAccion: user.idUsuario, 
       }); 
       if (ok) { 
         setCompletionMessage('Se ha completado la Hoja de Vida.'); 
-        setHojaVidaActual({ ...hojaVidaActual, estado: 'COMPLETO' }); 
+        setHojaVidaActual({ ...hojaVidaActual, estado: ESTADO_COMPLETO }); 
+        onEstadoChange?.(ESTADO_COMPLETO);
       } else { 
         setCompletionError('No se pudo completar la Hoja de Vida.'); 
       } 
@@ -686,6 +697,40 @@ export function VistaPrevia({
       setIsCompleting(false); 
     } 
   }; 
+
+  const handleEditarHojaVida = async () => {
+    if (!user?.idUsuario) {
+      setCompletionError('No se pudo habilitar la ediciÃ³n de la Hoja de Vida.');
+      return;
+    }
+    if (!hojaVidaActual?.idHojaVida) {
+      setCompletionError('No se encontrÃ³ la Hoja de Vida.');
+      return;
+    }
+    setIsUnlocking(true);
+    setCompletionMessage(null);
+    setCompletionError(null);
+    try {
+      const ok = await updateHojaVidaEstado({
+        idHojaVida: hojaVidaActual.idHojaVida,
+        idPersona: user?.idPersona ?? 0,
+        version: hojaVidaActual.version ?? 0,
+        estado: ESTADO_EDICION,
+        usuarioAccion: user.idUsuario,
+      });
+      if (ok) {
+        setCompletionMessage('EdiciÃ³n habilitada. Ya puedes actualizar tu Hoja de Vida.');
+        setHojaVidaActual({ ...hojaVidaActual, estado: ESTADO_EDICION });
+        onEstadoChange?.(ESTADO_EDICION);
+      } else {
+        setCompletionError('No se pudo habilitar la ediciÃ³n de la Hoja de Vida.');
+      }
+    } catch {
+      setCompletionError('No se pudo habilitar la ediciÃ³n de la Hoja de Vida.');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
 
   const handleDownload = () => {
     if (isLoading) {
@@ -765,16 +810,29 @@ export function VistaPrevia({
               )}
             </div>
             <div className="flex items-center gap-2 print:hidden">
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-1 text-xs"
-                onClick={handleCompletarHojaVida}
-                disabled={isCompleting || isHojaVidaCompleta}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Completado
-              </Button>
+              {isHojaVidaCompleta ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1 text-xs"
+                  onClick={handleEditarHojaVida}
+                  disabled={isUnlocking || isCompleting}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Editar
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1 text-xs"
+                  onClick={handleCompletarHojaVida}
+                  disabled={isCompleting || isUnlocking}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Completado
+                </Button>
+              )}
               <button
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors print:hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleDownload}
@@ -1147,28 +1205,23 @@ export function VistaPrevia({
             </div>
             <h4 className="text-lg font-bold" style={{ color: '#04a25c' }}>Experiencia Profesional</h4>
           </div>
-        <div className="flex flex-col gap-3">
-          {totalExperienciaGeneral.totalDays > 0 && (
-            <p className="text-sm text-gray-700 whitespace-nowrap">
-              Total experiencia general: {totalExperienciaGeneral.years} años, {totalExperienciaGeneral.months} meses, {totalExperienciaGeneral.days} días
-            </p>
-          )}
-          {totalExperienciaEspecifica.totalDays > 0 && (
-            <p className="text-sm text-gray-700 whitespace-nowrap">
-              Total experiencia específica: {totalExperienciaEspecifica.years} años, {totalExperienciaEspecifica.months} meses, {totalExperienciaEspecifica.days} días
-            </p>
-          )}
+          <div className="flex flex-col gap-3">
+            {totalExperienciaEspecifica.totalDays > 0 && (
+              <p className="text-sm text-gray-700 whitespace-nowrap">
+                Total experiencia espec?fica: {totalExperienciaEspecifica.years} a?os, {totalExperienciaEspecifica.months} meses, {totalExperienciaEspecifica.days} d?as
+              </p>
+            )}
+            {totalExperienciaTotal.totalDays > 0 && (
+              <p className="text-sm text-gray-700 whitespace-nowrap">
+                Total experiencia: {totalExperienciaTotal.years} a?os, {totalExperienciaTotal.months} meses, {totalExperienciaTotal.days} d?as
+              </p>
+            )}
+          </div>
         </div>
-      </div>
 
       <div className="space-y-8">
         <div>
-          <h5 className="text-base font-semibold text-gray-900 mb-4">Experiencia General</h5>
-          {renderExperiencias(experienciasGenerales, 'No se ha registrado experiencia profesional')}
-        </div>
-        <div>
-          <h5 className="text-base font-semibold text-gray-900 mb-4">Experiencia Específica</h5>
-          {renderExperiencias(experienciasEspecificas, 'No se ha registrado experiencia específica')}
+          {renderExperiencias(experiencias, 'No se ha registrado experiencia profesional')}
         </div>
       </div>
       </Card>

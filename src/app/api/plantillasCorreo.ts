@@ -35,14 +35,30 @@ const normalizeNumber = (value: any, fallback = 0) => {
 const normalizePlantillaCorreo = (raw: any): PlantillaCorreoItem | null => {
   if (!raw) return null;
   const idPlantilla = normalizeNumber(
-    raw.idPlantilla ?? raw.id_plantilla ?? raw.idPlantillaCorreo ?? raw.id ?? 0,
+    raw.idPlantilla ??
+      raw.id_plantilla ??
+      raw.idPlantillaCorreo ??
+      raw.id ??
+      raw.ID_PLANTILLA ??
+      raw.ID ??
+      0,
   );
-  const codigo = String(raw.codigo ?? raw.codPlantilla ?? raw.cod ?? '');
-  const nombre = String(raw.nombre ?? raw.nom ?? raw.descripcion ?? '');
-  const asunto = String(raw.asunto ?? raw.subject ?? '');
-  const cuerpo = String(raw.cuerpo ?? raw.contenido ?? raw.body ?? '');
-  const activo = normalizeNumber(raw.activo ?? raw.estado ?? raw.act ?? 1, 1);
-  const version = normalizeNumber(raw.version ?? raw.ver ?? raw.versionPlantilla ?? 1, 1);
+  const codigo = String(
+    raw.codigo ?? raw.codPlantilla ?? raw.cod ?? raw.CODIGO ?? raw.COD_PLANTILLA ?? '',
+  );
+  const nombre = String(
+    raw.nombre ?? raw.nom ?? raw.descripcion ?? raw.NOMBRE ?? raw.DESCRIPCION ?? '',
+  );
+  const asunto = String(raw.asunto ?? raw.subject ?? raw.ASUNTO ?? raw.SUBJECT ?? '');
+  const cuerpo = String(raw.cuerpo ?? raw.contenido ?? raw.body ?? raw.CUERPO ?? raw.BODY ?? '');
+  const activo = normalizeNumber(
+    raw.activo ?? raw.estado ?? raw.act ?? raw.ACTIVO ?? raw.ESTADO ?? 1,
+    1,
+  );
+  const version = normalizeNumber(
+    raw.version ?? raw.ver ?? raw.versionPlantilla ?? raw.VERSION ?? raw.VER ?? 1,
+    1,
+  );
 
   if (!idPlantilla && !codigo && !nombre) return null;
 

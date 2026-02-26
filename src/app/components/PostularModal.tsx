@@ -72,37 +72,9 @@ export function PostularModal({
             </div>
           </div>
           <DialogDescription>
-            Para registrarte debes completar tu hoja de vida primero.
+            Asegúrese de completar su hoja de vida y marcarla como completada.
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4 space-y-4">
-          <p className="text-gray-700">
-            Servicio: <span className="font-semibold text-gray-900">{nombreConvocatoria}</span>
-          </p>
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-            <p className="text-sm text-blue-900 font-medium mb-2">
-              Antes de registrarte, debes completar todas las pestañas de tu hoja de vida:
-            </p>
-            <ul className="space-y-1.5 text-sm text-blue-800">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Datos Personales</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Formación Académica</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Experiencia Profesional</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Declaraciones Juradas</span>
-              </li>
-            </ul>
-          </div>
-        </div>
         <DialogFooter className="flex gap-3 sm:justify-end">
           <Button variant="outline" onClick={onClose}>
             Cancelar

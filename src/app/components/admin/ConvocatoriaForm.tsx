@@ -154,8 +154,9 @@ export function ConvocatoriaForm({
 
   const getDefaultDates = () => {
     const start = new Date();
+    start.setDate(start.getDate() + 10);
     const end = new Date(start);
-    end.setMonth(end.getMonth() + 3);
+    end.setFullYear(end.getFullYear() + 3);
     return {
       fechaInicio: formatDate(start),
       fechaFin: formatDate(end),
@@ -626,7 +627,7 @@ export function ConvocatoriaForm({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="p-6">
+        <Card className="p-6" style={{ display: 'none' }}>
           <h3 className="text-lg font-bold mb-4" style={{ color: '#04a25c' }}>
             Información General
           </h3>

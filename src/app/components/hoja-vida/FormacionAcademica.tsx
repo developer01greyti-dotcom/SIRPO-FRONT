@@ -66,9 +66,10 @@ interface Curso {
 
 interface FormacionAcademicaProps {
   user: LoginResponse | null;
+  isLocked?: boolean;
 }
 
-export function FormacionAcademica({ user }: FormacionAcademicaProps) {
+export function FormacionAcademica({ user, isLocked = false }: FormacionAcademicaProps) {
   const [vistaActual, setVistaActual] = useState<'listados' | 'formacion-form' | 'curso-form' | 'pdf-viewer'>('listados');
   const [modoEdicion, setModoEdicion] = useState<'crear' | 'editar'>('crear');
   const [formacionSeleccionada, setFormacionSeleccionada] = useState<Formacion | null>(null);
@@ -206,24 +207,31 @@ export function FormacionAcademica({ user }: FormacionAcademicaProps) {
   };
 
   const handleAgregarFormacion = () => {
+    if (isLocked) return;
     setModoEdicion('crear');
     setFormacionSeleccionada(null);
     setVistaActual('formacion-form');
   };
 
   const handleEditarFormacion = (formacion: Formacion) => {
+    if (isLocked) return;
     setModoEdicion('editar');
     setFormacionSeleccionada(formacion);
     setVistaActual('formacion-form');
   };
 
   const handleEliminarFormacion = (id: string) => {
+    if (isLocked) return;
     const seleccionada = formaciones.find((item) => item.id === id) || null;
     setFormacionAEliminar(seleccionada);
     setDialogEliminar(true);
   };
 
   const confirmarEliminarFormacion = async () => {
+    if (isLocked) {
+      setDialogEliminar(false);
+      return;
+    }
     if (!formacionAEliminar) {
       setDialogEliminar(false);
       return;
@@ -251,18 +259,21 @@ export function FormacionAcademica({ user }: FormacionAcademicaProps) {
   };
 
   const handleAgregarCurso = () => {
+    if (isLocked) return;
     setModoEdicion('crear');
     setCursoSeleccionado(null);
     setVistaActual('curso-form');
   };
 
   const handleEditarCurso = (curso: Curso) => {
+    if (isLocked) return;
     setModoEdicion('editar');
     setCursoSeleccionado(curso);
     setVistaActual('curso-form');
   };
 
   const handleEliminarCurso = async (curso: Curso) => {
+    if (isLocked) return;
     if (!user?.idUsuario) {
       setLoadError('No se pudo eliminar el curso.');
       return;
@@ -346,6 +357,7 @@ export function FormacionAcademica({ user }: FormacionAcademicaProps) {
               type="button"
               onClick={handleAgregarFormacion}
               className="gap-2 bg-green-600 hover:bg-green-700"
+              disabled={isLocked}
             >
               <Plus className="w-4 h-4" />
               Agregar
@@ -402,35 +414,54 @@ export function FormacionAcademica({ user }: FormacionAcademicaProps) {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="w-4 h-4" />
+                        {isLocked ? (
+                          formacion.documento ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPdfUrl(formacion.documento);
+                                setPdfTitle(formacion.carrera);
+                                setVistaActual('pdf-viewer');
+                              }}
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              Ver
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditarFormacion(formacion)}>
-                              <Edit2 className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEliminarFormacion(formacion.id)} className="text-red-600">
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                            {formacion.documento && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setPdfUrl(formacion.documento);
-                                  setPdfTitle(formacion.carrera);
-                                  setVistaActual('pdf-viewer');
-                                }}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                Ver
+                          ) : (
+                            <span className="text-xs text-gray-400">Bloqueado</span>
+                          )
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditarFormacion(formacion)}>
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Editar
                               </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              <DropdownMenuItem onClick={() => handleEliminarFormacion(formacion.id)} className="text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                              {formacion.documento && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setPdfUrl(formacion.documento);
+                                    setPdfTitle(formacion.carrera);
+                                    setVistaActual('pdf-viewer');
+                                  }}
+                                >
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Ver
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -456,6 +487,7 @@ export function FormacionAcademica({ user }: FormacionAcademicaProps) {
               type="button"
               onClick={handleAgregarCurso}
               className="gap-2 bg-green-600 hover:bg-green-700"
+              disabled={isLocked}
             >
               <Plus className="w-4 h-4" />
               Agregar
@@ -516,35 +548,54 @@ export function FormacionAcademica({ user }: FormacionAcademicaProps) {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="w-4 h-4" />
+                        {isLocked ? (
+                          curso.documento ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPdfUrl(curso.documento);
+                                setPdfTitle(curso.descripcion);
+                                setVistaActual('pdf-viewer');
+                              }}
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              Ver
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditarCurso(curso)}>
-                              <Edit2 className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEliminarCurso(curso)} className="text-red-600">
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                            {curso.documento && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setPdfUrl(curso.documento);
-                                  setPdfTitle(curso.descripcion);
-                                  setVistaActual('pdf-viewer');
-                                }}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                Ver
+                          ) : (
+                            <span className="text-xs text-gray-400">Bloqueado</span>
+                          )
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditarCurso(curso)}>
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Editar
                               </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              <DropdownMenuItem onClick={() => handleEliminarCurso(curso)} className="text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                              {curso.documento && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setPdfUrl(curso.documento);
+                                    setPdfTitle(curso.descripcion);
+                                    setVistaActual('pdf-viewer');
+                                  }}
+                                >
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Ver
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </td>
                     </tr>
                   ))

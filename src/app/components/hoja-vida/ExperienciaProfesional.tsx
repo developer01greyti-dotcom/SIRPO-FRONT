@@ -42,7 +42,13 @@ interface Experiencia {
   experienciaEspecifica?: boolean;
 }
 
-export function ExperienciaProfesional({ user }: { user: LoginResponse | null }) {
+export function ExperienciaProfesional({
+  user,
+  isLocked = false,
+}: {
+  user: LoginResponse | null;
+  isLocked?: boolean;
+}) {
   const [experiencias, setExperiencias] = useState<Experiencia[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -162,18 +168,21 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
   };
 
   const handleAgregarExperiencia = () => {
+    if (isLocked) return;
     setModoFormulario('crear');
     setExperienciaToEdit(null);
     setVistaActual('formulario');
   };
 
   const handleEditarExperiencia = (experiencia: Experiencia) => {
+    if (isLocked) return;
     setModoFormulario('editar');
     setExperienciaToEdit(experiencia);
     setVistaActual('formulario');
   };
 
   const handleEliminarExperiencia = (id: string) => {
+    if (isLocked) return;
     setExperienciaToDelete(id);
     setDialogEliminar(true);
   };
@@ -296,8 +305,6 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
   };
 
   const experienciasEspecificas = experiencias.filter((exp) => exp.experienciaEspecifica);
-  const experienciasGenerales = experiencias.filter((exp) => !exp.experienciaEspecifica);
-  const totalExperienciaGeneral = calcularTotalExperiencia(experienciasGenerales);
   const totalExperienciaEspecifica = calcularTotalExperiencia(experienciasEspecificas);
   const totalExperienciaTotal = calcularTotalExperiencia(experiencias);
 
@@ -346,6 +353,7 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
               <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Cargo</th>
               <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Entidad</th>
               <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Tipo Experiencia</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Específica</th>
               <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Tipo Entidad</th>
               <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Periodo</th>
               <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 tracking-wider">Motivo de Cese</th>
@@ -361,6 +369,9 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
                 <td className="px-6 py-4 text-sm text-gray-900">{experiencia.nombreEntidad || '-'}</td>
                 <td className="px-6 py-4 text-sm text-gray-900">
                   {getTipoExperienciaLabel(experiencia.tipoExperiencia)}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  {experiencia.experienciaEspecifica ? 'Sí' : 'No'}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900">
                   {getTipoEntidadLabel(experiencia.tipoEntidad)}
@@ -381,42 +392,61 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEditarExperiencia(experiencia)}>
-                        <Edit2 className="w-4 h-4 mr-2" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          handleEliminarExperiencia(
-                            experiencia.idHvExperiencia || experiencia.id,
-                          )
-                        }
-                        className="text-red-600"
+                  {isLocked ? (
+                    experiencia.certificadoPreview ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setVistaActual('pdf-viewer');
+                          setPdfUrl(experiencia.certificadoPreview || '');
+                          setPdfTitle(`Certificado - ${experiencia.cargo}`);
+                        }}
                       >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Eliminar
-                      </DropdownMenuItem>
-                      {experiencia.certificadoPreview && (
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setVistaActual('pdf-viewer');
-                            setPdfUrl(experiencia.certificadoPreview || '');
-                            setPdfTitle(`Certificado - ${experiencia.cargo}`);
-                          }}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver
+                        <Eye className="w-4 h-4 mr-2" />
+                        Ver
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-gray-400">Bloqueado</span>
+                    )
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditarExperiencia(experiencia)}>
+                          <Edit2 className="w-4 h-4 mr-2" />
+                          Editar
                         </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleEliminarExperiencia(
+                              experiencia.idHvExperiencia || experiencia.id,
+                            )
+                          }
+                          className="text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Eliminar
+                        </DropdownMenuItem>
+                        {experiencia.certificadoPreview && (
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setVistaActual('pdf-viewer');
+                              setPdfUrl(experiencia.certificadoPreview || '');
+                              setPdfTitle(`Certificado - ${experiencia.cargo}`);
+                            }}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            Ver
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </td>
               </tr>
             ))}
@@ -445,6 +475,7 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
                   type="button"
                   onClick={handleAgregarExperiencia}
                   className="gap-2 bg-green-600 hover:bg-green-700"
+                  disabled={isLocked}
                 >
                   <Plus className="w-4 h-4" />
                   Agregar
@@ -466,9 +497,6 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
                 <div className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
                   <span className="font-semibold text-gray-900">Totales:</span>
                   <span>
-                    General: {totalExperienciaGeneral.years} años, {totalExperienciaGeneral.months} meses, {totalExperienciaGeneral.days} días
-                  </span>
-                  <span>
                     Específica: {totalExperienciaEspecifica.years} años, {totalExperienciaEspecifica.months} meses, {totalExperienciaEspecifica.days} días
                   </span>
                   <span className="font-semibold text-gray-900">
@@ -476,27 +504,7 @@ export function ExperienciaProfesional({ user }: { user: LoginResponse | null })
                   </span>
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-base font-semibold text-gray-900">Experiencia General</h4>
-                    {totalExperienciaGeneral.totalDays > 0 && (
-                      <p className="text-sm text-gray-700 whitespace-nowrap">
-                        Total: {totalExperienciaGeneral.years} años, {totalExperienciaGeneral.months} meses, {totalExperienciaGeneral.days} días
-                      </p>
-                    )}
-                  </div>
-                  {renderExperienciasTable(experienciasGenerales, 'No hay experiencias profesionales registradas')}
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-base font-semibold text-gray-900">Experiencia Específica</h4>
-                    {totalExperienciaEspecifica.totalDays > 0 && (
-                      <p className="text-sm text-gray-700 whitespace-nowrap">
-                        Total: {totalExperienciaEspecifica.years} años, {totalExperienciaEspecifica.months} meses, {totalExperienciaEspecifica.days} días
-                      </p>
-                    )}
-                  </div>
-                  {renderExperienciasTable(experienciasEspecificas, 'No hay experiencias específicas registradas')}
+                  {renderExperienciasTable(experiencias, 'No hay experiencias profesionales registradas')}
                 </div>
               </div>
             )}

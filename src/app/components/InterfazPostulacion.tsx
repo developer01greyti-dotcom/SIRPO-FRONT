@@ -148,6 +148,25 @@ export function InterfazPostulacion({
     relacion: '',
     unidad: '',
   });
+  const formatFechaAuto = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+  const fechaInicioAuto = (() => {
+    const start = new Date();
+    start.setDate(start.getDate() + 10);
+    return formatFechaAuto(start);
+  })();
+  const fechaFinAuto = (() => {
+    const end = new Date();
+    end.setDate(end.getDate() + 10);
+    end.setFullYear(end.getFullYear() + 3);
+    return formatFechaAuto(end);
+  })();
+  const fechaInicioDisplay = convocatoria.fechaInicio || fechaInicioAuto;
+  const fechaFinDisplay = convocatoria.fechaFin || fechaFinAuto;
 
   useEffect(() => {
     let isActive = true;
@@ -367,22 +386,22 @@ export function InterfazPostulacion({
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3" style={{ display: 'none' }}>
                   <Calendar className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase">Fecha Inicio</p>
                     <p className="text-sm font-medium text-gray-900 mt-0.5">
-                      {convocatoria.fechaInicio}
+                      {fechaInicioDisplay}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3" style={{ display: 'none' }}>
                   <Calendar className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase">Fecha Fin</p>
                     <p className="text-sm font-medium text-gray-900 mt-0.5">
-                      {convocatoria.fechaFin}
+                      {fechaFinDisplay}
                     </p>
                     {convocatoria.diasRestantes <= 3 && (
                       <p className="text-xs text-red-600 font-semibold mt-1">

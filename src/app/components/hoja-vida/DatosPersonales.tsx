@@ -46,6 +46,8 @@ interface DatosPersonalesProps {
 
   user: LoginResponse | null;
 
+  isLocked?: boolean;
+
 }
 
 
@@ -132,7 +134,7 @@ const emptyForm: DatosPersonalesForm = {
 
 
 
-export function DatosPersonales({ user }: DatosPersonalesProps) {
+export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps) {
 
   const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<DropdownItem[]>([]);
 
@@ -211,6 +213,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
   const [sctrDeleted, setSctrDeleted] = useState(false);
 
   const [showSctrModal, setShowSctrModal] = useState(false);
+
+  const isEditingLocked = Boolean(isLocked);
 
   const revokePreviewUrl = (url: string | null) => {
     if (url && url.startsWith('blob:')) {
@@ -913,6 +917,15 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
   const handleSave = async () => {
 
+    if (isEditingLocked) {
+
+      setSaveMessage('La Hoja de Vida estÃ¡ bloqueada. Usa "Editar" en Vista Previa para habilitar cambios.');
+      setSaveMessageType('error');
+
+      return;
+
+    }
+
     if (!user?.idUsuario) {
 
       setSaveMessage('No se encontró el usuario autenticado.');
@@ -1148,6 +1161,8 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
   const removeVoucher = () => {
 
+    if (isEditingLocked) return;
+
     revokePreviewUrl(voucherPreview);
     setVoucherPreview(null);
 
@@ -1186,6 +1201,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
   };
 
   const removeRnp = () => {
+    if (isEditingLocked) return;
     revokePreviewUrl(rnpPreview);
     setRnpPreview(null);
     setRnpFile(null);
@@ -1223,6 +1239,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
 
   const removeSeguroSalud = () => {
+    if (isEditingLocked) return;
 
     revokePreviewUrl(seguroSaludPreview);
     setSeguroSaludPreview(null);
@@ -1273,6 +1290,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
 
   const removeSctr = () => {
+    if (isEditingLocked) return;
 
     revokePreviewUrl(sctrPreview);
     setSctrPreview(null);
@@ -1336,13 +1354,13 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 onValueChange={(value) => updateField('tipoDocumento', value)}
 
                 required
-                disabled={isDocumentoLocked}
+                disabled={isEditingLocked || isDocumentoLocked}
 
               >
 
                 <SelectTrigger
                   id="tipoDocumento"
-                  disabled={isDocumentoLocked}
+                  disabled={isEditingLocked || isDocumentoLocked}
                   className={isDocumentoLocked ? 'bg-gray-50' : undefined}
                 >
 
@@ -1395,6 +1413,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="numeroDocumento">Nro. de documento *</Label>
 
               <Input
+                disabled={isEditingLocked}
 
                 id="numeroDocumento"
 
@@ -1424,6 +1443,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="nombres">Nombres *</Label>
 
               <Input
+                disabled={isEditingLocked}
 
                 id="nombres"
 
@@ -1450,6 +1470,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="apellidoPaterno">Apellido paterno *</Label>
 
               <Input
+                disabled={isEditingLocked}
 
                 id="apellidoPaterno"
 
@@ -1476,6 +1497,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="apellidoMaterno">Apellido materno *</Label>
 
               <Input
+                disabled={isEditingLocked}
 
                 id="apellidoMaterno"
 
@@ -1510,10 +1532,11 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 onValueChange={(value) => updateField('sexo', value)}
 
                 required
+                disabled={isEditingLocked}
 
               >
 
-                <SelectTrigger id="sexo">
+                <SelectTrigger id="sexo" disabled={isEditingLocked}>
 
                   <SelectValue placeholder="Seleccione" />
 
@@ -1566,10 +1589,11 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 onValueChange={(value) => updateField('estadoCivil', value)}
 
                 required
+                disabled={isEditingLocked}
 
               >
 
-                <SelectTrigger id="estadoCivil">
+                <SelectTrigger id="estadoCivil" disabled={isEditingLocked}>
 
                   <SelectValue placeholder="Seleccione" />
 
@@ -1614,6 +1638,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="fechaNacimiento">Fecha nacimiento *</Label>
 
               <Input
+                disabled={isEditingLocked}
                 id="fechaNacimiento"
                 type="date"
                 placeholder="dd/mm/aaaa"
@@ -1634,6 +1659,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="nacionalidad">Nacionalidad *</Label>
 
               <Input
+                disabled={isEditingLocked}
 
                 id="nacionalidad"
 
@@ -1666,6 +1692,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
 
                 <Input
+                disabled={isEditingLocked}
 
                   id="correo"
 
@@ -1699,6 +1726,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
 
                 <Input
+                disabled={isEditingLocked}
 
                   id="correoSecundario"
 
@@ -1727,6 +1755,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="ruc">RUC *</Label>
 
               <Input
+                disabled={isEditingLocked}
 
                 id="ruc"
 
@@ -1758,6 +1787,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
 
                 <Input
+                disabled={isEditingLocked}
 
                   id="celular"
 
@@ -1792,6 +1822,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
 
                 <Input
+                disabled={isEditingLocked}
 
                   id="cuentaBn"
 
@@ -1826,6 +1857,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                 <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
 
                 <Input
+                disabled={isEditingLocked}
 
                   id="cciBn"
 
@@ -1884,6 +1916,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                   id="voucher"
 
                   type="file"
+                  disabled={isEditingLocked}
 
                   accept="image/*,application/pdf"
 
@@ -1944,6 +1977,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                         size="sm"
 
                         className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        disabled={isEditingLocked}
 
                         onClick={removeVoucher}
 
@@ -1997,6 +2031,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                   id="rnpConstancia"
 
                   type="file"
+                  disabled={isEditingLocked}
 
                   accept="image/*,application/pdf"
 
@@ -2057,6 +2092,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                         size="sm"
 
                         className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        disabled={isEditingLocked}
 
                         onClick={removeRnp}
 
@@ -2110,6 +2146,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                   id="seguroSalud"
 
                   type="file"
+                  disabled={isEditingLocked}
 
                   accept="image/*,application/pdf"
 
@@ -2170,6 +2207,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                         size="sm"
 
                         className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        disabled={isEditingLocked}
 
                         onClick={removeSeguroSalud}
 
@@ -2224,6 +2262,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                   id="sctr"
 
                   type="file"
+                  disabled={isEditingLocked}
 
                   accept="image/*,application/pdf"
 
@@ -2284,6 +2323,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                         size="sm"
 
                         className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        disabled={isEditingLocked}
 
                         onClick={removeSctr}
 
@@ -2336,6 +2376,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="direccionDomicilio">Dirección *</Label>
 
               <Input
+                disabled={isEditingLocked}
 
                 id="direccionDomicilio"
 
@@ -2360,6 +2401,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
               <Label htmlFor="referenciaDomicilio">Referencia *</Label>
 
               <Input
+                disabled={isEditingLocked}
 
                 id="referenciaDomicilio"
 
@@ -2406,10 +2448,11 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                   }
 
                 }}
+                disabled={isEditingLocked}
 
               >
 
-                <SelectTrigger id="ubigeoSelect">
+                <SelectTrigger id="ubigeoSelect" disabled={isEditingLocked}>
 
                   <SelectValue placeholder="Buscar ubigeo" />
 
@@ -2422,6 +2465,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                     <div className="flex gap-2">
 
                       <Input
+                disabled={isEditingLocked}
 
                         id="ubigeoSearch"
 
@@ -2468,6 +2512,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
                         size="sm"
 
                         className="w-[15%]"
+                        disabled={isEditingLocked}
 
                         onMouseDown={(event) => event.preventDefault()}
 
@@ -2599,7 +2644,7 @@ export function DatosPersonales({ user }: DatosPersonalesProps) {
 
                 onClick={handleSave}
 
-                disabled={isSaving}
+                disabled={isSaving || isEditingLocked}
 
               >
 
