@@ -269,16 +269,16 @@ export function DeclaracionesJuradasAdmin({ adminUserId = 0 }: DeclaracionesJura
             Configurar plantillas Word para declaraciones juradas
           </p>
         </div>
-        <Button onClick={handleAgregar} className="bg-green-600 hover:bg-green-700 gap-2">
+        <Button onClick={handleAgregar} className="w-full md:w-auto bg-green-600 hover:bg-green-700 gap-2">
           <Plus className="w-4 h-4" />
           Nuevo Espacio
         </Button>
       </div>
 
       <Tabs value={selectedId} onValueChange={handleSelect}>
-        <TabsList className="flex flex-wrap gap-2 mb-6">
+        <TabsList className="flex w-full flex-nowrap gap-2 overflow-x-auto pb-1 mb-6">
           {declaraciones.map((item) => (
-            <TabsTrigger key={item.id} value={item.id}>
+            <TabsTrigger key={item.id} value={item.id} className="whitespace-nowrap">
               {item.titulo}
             </TabsTrigger>
           ))}
@@ -321,7 +321,7 @@ export function DeclaracionesJuradasAdmin({ adminUserId = 0 }: DeclaracionesJura
                 <label className="block text-sm font-semibold text-gray-700">
                   Plantilla Word
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <input
                     type="file"
                     id={`plantilla-${selectedId}`}
@@ -350,7 +350,7 @@ export function DeclaracionesJuradasAdmin({ adminUserId = 0 }: DeclaracionesJura
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-xs font-semibold text-blue-900 mb-2">Variables disponibles (usar llaves):</p>
-                <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-blue-800">
                   <div>- {'{'}nombre{'}'} - Nombres del postulante</div>
                   <div>- {'{'}apellidos{'}'} - Apellidos del postulante</div>
                   <div>- {'{'}apellido paterno{'}'} - Apellido paterno</div>
@@ -365,7 +365,7 @@ export function DeclaracionesJuradasAdmin({ adminUserId = 0 }: DeclaracionesJura
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-4">
+              <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center">
                 <Button
                   onClick={handleGuardar}
                   className="bg-green-600 hover:bg-green-700 gap-2"

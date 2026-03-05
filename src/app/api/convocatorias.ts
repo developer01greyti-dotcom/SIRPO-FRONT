@@ -28,6 +28,7 @@ export interface ConvocatoriaListItem {
   numeroVacantes?: number;
   requisitosMinimos?: string;
   funcionesPrincipales?: string;
+  resultadosEsperados?: string;
   conocimientos?: string[];
   conocimientosIds?: number[];
   salarioMin?: number;
@@ -46,6 +47,7 @@ export interface ConvocatoriaUpsertPayload {
   fechaFin: string;
   requisitosMinimos: string;
   funcionesPrincipales: string;
+  resultadosEsperados: string;
   estado: string;
   idArchivoBases: number;
   usuarioAccion: number;
@@ -133,8 +135,14 @@ export const fetchConvocatoriasList = async (
     numeroVacantes: item.numeroVacantes ?? 0,
     requisitosMinimos: item.requisitosMinimos ?? item.clob1 ?? '',
     funcionesPrincipales: item.funcionesPrincipales ?? item.clob2 ?? '',
-    conocimientos: parseConocimientos(item.conocimientos ?? item.clob3 ?? item.clob_3 ?? ''),
+    conocimientos: parseConocimientos(item.conocimientos ?? ''),
     conocimientosIds: parseConocimientoIds(item.conocimientosIds ?? item.conocimientos_ids ?? ''),
+    resultadosEsperados:
+      item.resultadosEsperados ??
+      item.resultados_esperados ??
+      item.clob3 ??
+      item.clob_3 ??
+      '',
     salarioMin: item.salarioMin ?? 0,
     salarioMax: item.salarioMax ?? 0,
     archivoGuid: item.archivoGuid ?? '',
@@ -144,31 +152,30 @@ export const fetchConvocatoriasList = async (
 export const upsertConvocatoria = async (
   payload: ConvocatoriaUpsertPayload,
 ): Promise<number> => {
-  const response = await apiClient.post<Array<{ idConvocatoria: number }>>(
-    '/conv_upsert/list',
-    {
-      estructura: {
-        idConvocatoria: payload.idConvocatoria,
-        titulo: payload.titulo,
-        idPerfil: payload.idPerfil,
-        idOficinaCoordinacion: payload.idOficinaCoordinacion,
-        tipoContrato: payload.tipoContrato,
-        numeroVacantes: payload.numeroVacantes,
-        fechaInicio: payload.fechaInicio,
-        fechaFin: payload.fechaFin,
-        clob1: payload.requisitosMinimos,
-        clob2: payload.funcionesPrincipales,
-        estado: payload.estado,
-        idArchivoBases: payload.idArchivoBases,
-        usuarioAccion: payload.usuarioAccion,
-      },
+  const response = await apiClient.post<any>('/conv_upsert/list', {
+    estructura: {
+      idConvocatoria: payload.idConvocatoria,
+      titulo: payload.titulo,
+      idPerfil: payload.idPerfil,
+      idOficinaCoordinacion: payload.idOficinaCoordinacion,
+      tipoContrato: payload.tipoContrato,
+      numeroVacantes: payload.numeroVacantes,
+      fechaInicio: payload.fechaInicio,
+      fechaFin: payload.fechaFin,
+      requisitosMinimos: payload.requisitosMinimos,
+      funcionesPrincipales: payload.funcionesPrincipales,
+      resultadosEsperados: payload.resultadosEsperados,
+      estado: payload.estado,
+      idArchivoBases: payload.idArchivoBases,
+      usuarioAccion: payload.usuarioAccion,
     },
-  );
+  });
   const data = response.data;
   if (Array.isArray(data) && data.length > 0 && data[0]?.idConvocatoria) {
     return Number(data[0].idConvocatoria);
   }
-  return 0;
+  const normalized = Array.isArray(data) ? data[0] : data;
+  return Number(normalized?.idConvocatoria ?? normalized?.id ?? 0) || 0;
 };
 
 export const deleteConvocatoria = async (

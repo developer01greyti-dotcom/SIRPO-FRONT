@@ -15,8 +15,6 @@ interface Postulacion {
   oficinaCoordinacion: string;
   perfil: string;
   fechaPostulacion: string;
-  fechaInicio: string;
-  fechaFin: string;
   estado: string;
 }
 
@@ -259,27 +257,6 @@ export function DetallePostulacion({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div className="flex items-start gap-3">
-              <Calendar className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase">Fecha Inicio Convocatoria</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">
-                  {postulacion.fechaInicio}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Calendar className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase">Fecha Fin Convocatoria</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">
-                  {postulacion.fechaFin}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </Card>
 

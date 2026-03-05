@@ -514,6 +514,7 @@ export function ExperienciaProfesional({
         <ExperienciaForm
           modo={modoFormulario}
           experiencia={experienciaToEdit}
+          experienciasExistentes={experiencias}
           onGuardar={handleSaveExperiencia}
           idHojaVida={hojaVidaId}
           usuarioAccion={user?.idUsuario || 0}

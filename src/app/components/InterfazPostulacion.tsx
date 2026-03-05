@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { X, Send, MapPin, Calendar, Briefcase, CheckCircle2, Edit3, FileText, Plus, Trash2 } from 'lucide-react';
+import { X, Send, MapPin, Briefcase, CheckCircle2, Edit3, FileText, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { VistaPrevia } from './hoja-vida/VistaPrevia';
 import type { LoginResponse } from '../api/auth';
 import { fetchHojaVidaActual, fetchHojaVidaDatos, downloadDeclaracionesPdf } from '../api/hojaVida';
+import { fetchDeclaracionTipos, fetchDeclaracionTiposPublic } from '../api/declaraciones';
 import { fetchConvocatoriaConocimientos } from '../api/convocatoriaConocimientos';
 
 interface Convocatoria {
@@ -139,6 +140,11 @@ export function InterfazPostulacion({
   const [anexo02TieneFamiliares, setAnexo02TieneFamiliares] = useState<boolean | null>(null);
   const [anexo03Completo, setAnexo03Completo] = useState(false);
   const [anexo04Completo, setAnexo04Completo] = useState(false);
+  const [anexoTitles, setAnexoTitles] = useState({
+    anexo02: 'Anexo 02: Declaración de familiares en DEVIDA',
+    anexo03: 'Anexo 03: Declaración de veracidad',
+    anexo04: 'Anexo 04: Declaración de compromiso',
+  });
   const [familiaresDevida, setFamiliaresDevida] = useState<FamiliarDevida[]>([]);
   const [showFamiliarModal, setShowFamiliarModal] = useState(false);
   const [familiarError, setFamiliarError] = useState('');
@@ -148,26 +154,6 @@ export function InterfazPostulacion({
     relacion: '',
     unidad: '',
   });
-  const formatFechaAuto = (date: Date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-  const fechaInicioAuto = (() => {
-    const start = new Date();
-    start.setDate(start.getDate() + 10);
-    return formatFechaAuto(start);
-  })();
-  const fechaFinAuto = (() => {
-    const end = new Date();
-    end.setDate(end.getDate() + 10);
-    end.setFullYear(end.getFullYear() + 3);
-    return formatFechaAuto(end);
-  })();
-  const fechaInicioDisplay = convocatoria.fechaInicio || fechaInicioAuto;
-  const fechaFinDisplay = convocatoria.fechaFin || fechaFinAuto;
-
   useEffect(() => {
     let isActive = true;
 
@@ -237,6 +223,98 @@ export function InterfazPostulacion({
   useEffect(() => {
     setConocimientosConfirmados(conocimientosAsignados.map(() => false));
   }, [conocimientosAsignados.join('|')]);
+
+  useEffect(() => {
+    let isActive = true;
+    const extractAnexoNumber = (value: string) => {
+      if (!value) return null;
+      const normalized = value.toLowerCase();
+      const match = normalized.match(/anexo[^0-9]*0*(\d+)/);
+      if (!match) return null;
+      const num = Number(match[1]);
+      return Number.isFinite(num) ? num : null;
+    };
+    const loadDeclaraciones = async () => {
+      try {
+        let items = await fetchDeclaracionTipos();
+        if (!items.length) {
+          items = await fetchDeclaracionTiposPublic();
+        }
+        if (!isActive || !items.length) return;
+        const sorted = [...items].sort(
+          (a, b) => a.idDeclaracionTipo - b.idDeclaracionTipo,
+        );
+        const titlesByNumero = new Map<number, string>();
+        sorted.forEach((item) => {
+          const numero = extractAnexoNumber(item.nombre || '');
+          if (numero && !titlesByNumero.has(numero)) {
+            titlesByNumero.set(numero, item.nombre);
+          }
+        });
+        sorted.forEach((item) => {
+          const inferred = Number(item.idDeclaracionTipo || 0) + 1;
+          if (inferred > 1 && !titlesByNumero.has(inferred)) {
+            titlesByNumero.set(inferred, item.nombre);
+          }
+        });
+        if (!titlesByNumero.has(2) && sorted[0]?.nombre) {
+          titlesByNumero.set(2, sorted[0].nombre);
+        }
+        if (!titlesByNumero.has(3) && sorted[1]?.nombre) {
+          titlesByNumero.set(3, sorted[1].nombre);
+        }
+        if (!titlesByNumero.has(4) && sorted[2]?.nombre) {
+          titlesByNumero.set(4, sorted[2].nombre);
+        }
+        setAnexoTitles((prev) => ({
+          anexo02: titlesByNumero.get(2) ?? prev.anexo02,
+          anexo03: titlesByNumero.get(3) ?? prev.anexo03,
+          anexo04: titlesByNumero.get(4) ?? prev.anexo04,
+        }));
+      } catch {
+        try {
+          const items = await fetchDeclaracionTiposPublic();
+          if (!isActive || !items.length) return;
+          const sorted = [...items].sort(
+            (a, b) => a.idDeclaracionTipo - b.idDeclaracionTipo,
+          );
+          const titlesByNumero = new Map<number, string>();
+          sorted.forEach((item) => {
+            const numero = extractAnexoNumber(item.nombre || '');
+            if (numero && !titlesByNumero.has(numero)) {
+              titlesByNumero.set(numero, item.nombre);
+            }
+          });
+          sorted.forEach((item) => {
+            const inferred = Number(item.idDeclaracionTipo || 0) + 1;
+            if (inferred > 1 && !titlesByNumero.has(inferred)) {
+              titlesByNumero.set(inferred, item.nombre);
+            }
+          });
+          if (!titlesByNumero.has(2) && sorted[0]?.nombre) {
+            titlesByNumero.set(2, sorted[0].nombre);
+          }
+          if (!titlesByNumero.has(3) && sorted[1]?.nombre) {
+            titlesByNumero.set(3, sorted[1].nombre);
+          }
+          if (!titlesByNumero.has(4) && sorted[2]?.nombre) {
+            titlesByNumero.set(4, sorted[2].nombre);
+          }
+          setAnexoTitles((prev) => ({
+            anexo02: titlesByNumero.get(2) ?? prev.anexo02,
+            anexo03: titlesByNumero.get(3) ?? prev.anexo03,
+            anexo04: titlesByNumero.get(4) ?? prev.anexo04,
+          }));
+        } catch {
+          // keep defaults
+        }
+      }
+    };
+    loadDeclaraciones();
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const handleAnexo02Change = (value: boolean) => {
     setAnexo02TieneFamiliares(value);
@@ -318,6 +396,10 @@ export function InterfazPostulacion({
     ...(experiencias ? { experiencias } : {}),
     ...(formaciones || cursos || experiencias ? { declaraciones: [] } : {}),
   };
+  const formatAnexoLabel = (label: string) => label.trim().replace(/[:：]\s*$/, '');
+  const anexo02Label = formatAnexoLabel(anexoTitles.anexo02);
+  const anexo03Label = formatAnexoLabel(anexoTitles.anexo03);
+  const anexo04Label = formatAnexoLabel(anexoTitles.anexo04);
 
   return (
     <div className="space-y-6">
@@ -386,31 +468,6 @@ export function InterfazPostulacion({
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3" style={{ display: 'none' }}>
-                  <Calendar className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase">Fecha Inicio</p>
-                    <p className="text-sm font-medium text-gray-900 mt-0.5">
-                      {fechaInicioDisplay}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3" style={{ display: 'none' }}>
-                  <Calendar className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase">Fecha Fin</p>
-                    <p className="text-sm font-medium text-gray-900 mt-0.5">
-                      {fechaFinDisplay}
-                    </p>
-                    {convocatoria.diasRestantes <= 3 && (
-                      <p className="text-xs text-red-600 font-semibold mt-1">
-                        ⚠ Quedan {convocatoria.diasRestantes}{' '}
-                        {convocatoria.diasRestantes === 1 ? 'día' : 'días'}
-                      </p>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -617,7 +674,7 @@ export function InterfazPostulacion({
           <div className="rounded-lg border border-amber-200 bg-white p-4 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-medium text-gray-900">Anexo 02: Declaración de familiares en DEVIDA</p>
+                <p className="font-medium text-gray-900">{anexo02Label}</p>
                 <p className="text-sm text-gray-600">
                   Indica si tienes familiares trabajando en DEVIDA.
                 </p>
@@ -700,7 +757,7 @@ export function InterfazPostulacion({
                   </div>
                 ) : (
                   <p className="text-sm text-red-600">
-                    Debes registrar al menos un familiar para completar el Anexo 02.
+                    Debes registrar al menos un familiar para completar {anexo02Label}.
                   </p>
                 )}
               </div>
@@ -710,7 +767,7 @@ export function InterfazPostulacion({
           <div className="rounded-lg border border-amber-200 bg-white p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-medium text-gray-900">Anexo 03: Declaración de veracidad</p>
+                <p className="font-medium text-gray-900">{anexo03Label}</p>
                 <p className="text-sm text-gray-600">
                   Confirmo que la información registrada es veraz y verificable.
                 </p>
@@ -724,14 +781,14 @@ export function InterfazPostulacion({
                 checked={anexo03Completo}
                 onCheckedChange={(value) => setAnexo03Completo(Boolean(value))}
               />
-              Completar Anexo 03
+              Completar {anexo03Label}
             </label>
           </div>
 
           <div className="rounded-lg border border-amber-200 bg-white p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-medium text-gray-900">Anexo 04: Declaración de compromiso</p>
+                <p className="font-medium text-gray-900">{anexo04Label}</p>
                 <p className="text-sm text-gray-600">
                   Acepto el compromiso y autorizo la validación de esta declaración.
                 </p>
@@ -745,7 +802,7 @@ export function InterfazPostulacion({
                 checked={anexo04Completo}
                 onCheckedChange={(value) => setAnexo04Completo(Boolean(value))}
               />
-              Completar Anexo 04
+              Completar {anexo04Label}
             </label>
           </div>
 
@@ -768,15 +825,15 @@ export function InterfazPostulacion({
           </p>
           <ul className="text-sm text-gray-700 space-y-1">
             <li>
-              Anexo 02:{' '}
+              {anexo02Label}:{' '}
               {anexo02TieneFamiliares === null
                 ? 'Pendiente'
                 : anexo02TieneFamiliares
                 ? `Familiares registrados (${familiaresDevida.length})`
                 : 'Sin familiares en DEVIDA'}
             </li>
-            <li>Anexo 03: {anexo03Completo ? 'Completo' : 'Pendiente'}</li>
-            <li>Anexo 04: {anexo04Completo ? 'Completo' : 'Pendiente'}</li>
+            <li>{anexo03Label}: {anexo03Completo ? 'Completo' : 'Pendiente'}</li>
+            <li>{anexo04Label}: {anexo04Completo ? 'Completo' : 'Pendiente'}</li>
           </ul>
         </div>
       </Card>
@@ -806,7 +863,7 @@ export function InterfazPostulacion({
           <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-lg">
             <h4 className="text-lg font-semibold text-gray-900">Registrar familiar en DEVIDA</h4>
             <p className="mt-1 text-sm text-gray-600">
-              Completa los datos requeridos para el Anexo 02.
+              Completa los datos requeridos para {anexo02Label}.
             </p>
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">

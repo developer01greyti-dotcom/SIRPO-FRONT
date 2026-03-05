@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, publicApiClient } from './client';
 
 export interface DeclaracionTipo {
   idDeclaracionTipo: number;
@@ -17,6 +17,17 @@ const normalizeDeclaracionTipo = (raw: any): DeclaracionTipo | null => {
 
 export const fetchDeclaracionTipos = async (): Promise<DeclaracionTipo[]> => {
   const response = await apiClient.post<any[] | any>('/declaracion_tipo/list', {
+    estructura: {},
+  });
+  const data = response.data;
+  const items = Array.isArray(data) ? data : data ? [data] : [];
+  return items
+    .map(normalizeDeclaracionTipo)
+    .filter((item): item is DeclaracionTipo => Boolean(item));
+};
+
+export const fetchDeclaracionTiposPublic = async (): Promise<DeclaracionTipo[]> => {
+  const response = await publicApiClient.post<any[] | any>('/declaracion_tipo/list', {
     estructura: {},
   });
   const data = response.data;

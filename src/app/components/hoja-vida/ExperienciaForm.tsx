@@ -42,6 +42,7 @@ interface Experiencia {
 interface ExperienciaFormProps {
   modo: 'crear' | 'editar';
   experiencia: Experiencia | null;
+  experienciasExistentes?: Experiencia[];
   idHojaVida: number;
   usuarioAccion: number;
   rucPersona?: string;
@@ -52,6 +53,7 @@ interface ExperienciaFormProps {
 export function ExperienciaForm({
   modo,
   experiencia,
+  experienciasExistentes = [],
   idHojaVida,
   usuarioAccion,
   rucPersona,
@@ -135,7 +137,58 @@ export function ExperienciaForm({
     (item) => String(item.id) === motivoCese,
   )?.descripcion?.toLowerCase() || '';
   const isActualidad = motivoCeseDescripcion.includes('actualidad');
+  const actualidadMotivoId = motivoCeseOptions.find((item) =>
+    item.descripcion?.toLowerCase().includes('actualidad'),
+  )?.id;
   const todayIso = new Date().toISOString().split('T')[0];
+  const normalizeDate = (date: Date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+  };
+  const parseFecha = (value: string): Date | null => {
+    if (!value) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      const [year, month, day] = value.split('-');
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+    if (value.includes('/')) {
+      const [dd, mm, yyyy] = value.split('/');
+      if (dd && mm && yyyy) {
+        return new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      }
+    }
+    const normalized = value.toLowerCase();
+    if (normalized.includes(' de ')) {
+      const match = normalized.match(/(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})/i);
+      if (match) {
+        const day = Number(match[1]);
+        const monthName = match[2];
+        const year = Number(match[3]);
+        const monthMap: Record<string, number> = {
+          enero: 0,
+          febrero: 1,
+          marzo: 2,
+          abril: 3,
+          mayo: 4,
+          junio: 5,
+          julio: 6,
+          agosto: 7,
+          septiembre: 8,
+          setiembre: 8,
+          octubre: 9,
+          noviembre: 10,
+          diciembre: 11,
+        };
+        const monthIndex = monthMap[monthName];
+        if (monthIndex !== undefined) {
+          return new Date(year, monthIndex, day);
+        }
+      }
+    }
+    const fallback = new Date(value);
+    return Number.isNaN(fallback.getTime()) ? null : fallback;
+  };
 
   useEffect(() => {
     let isActive = true;
@@ -408,6 +461,52 @@ export function ExperienciaForm({
       today.setHours(0, 0, 0, 0);
       if (!Number.isNaN(start.getTime()) && start > today) {
         setSaveMessage('La fecha inicio no puede ser mayor a la fecha actual.');
+        setSaveMessageType('error');
+        return;
+      }
+    }
+    if (!isActualidad && nuevaExperiencia.fechaFin) {
+      const end = new Date(nuevaExperiencia.fechaFin);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(end.getTime()) && end > today) {
+        setSaveMessage('La fecha fin no puede ser mayor a la fecha actual.');
+        setSaveMessageType('error');
+        return;
+      }
+    }
+
+    const startDate = parseFecha(nuevaExperiencia.fechaInicio);
+    const endDate = isActualidad
+      ? normalizeDate(new Date())
+      : parseFecha(nuevaExperiencia.fechaFin);
+    if (startDate && endDate) {
+      const normalizedStart = normalizeDate(startDate);
+      const normalizedEnd = normalizeDate(endDate);
+      const currentId = String(experiencia?.idHvExperiencia || experiencia?.id || '');
+      const hasOverlap = experienciasExistentes.some((item) => {
+        const itemId = String(item.idHvExperiencia || item.id || '');
+        if (currentId && itemId && currentId === itemId) return false;
+        const itemStart = parseFecha(item.fechaInicio);
+        if (!itemStart) return false;
+        let itemEnd = parseFecha(item.fechaFin);
+        const motivoValue = String(item.motivoCese || item.motivoCeseId || '').toLowerCase();
+        if (!itemEnd || motivoValue.includes('actual')) {
+          itemEnd = normalizeDate(new Date());
+        }
+        if (
+          actualidadMotivoId &&
+          String(item.motivoCeseId || '') === String(actualidadMotivoId)
+        ) {
+          itemEnd = normalizeDate(new Date());
+        }
+        if (!itemEnd) return false;
+        const normalizedItemStart = normalizeDate(itemStart);
+        const normalizedItemEnd = normalizeDate(itemEnd);
+        return normalizedStart <= normalizedItemEnd && normalizedItemStart <= normalizedEnd;
+      });
+      if (hasOverlap) {
+        setSaveMessage('Las fechas se traslapan con otra experiencia registrada.');
         setSaveMessageType('error');
         return;
       }
@@ -793,6 +892,7 @@ export function ExperienciaForm({
                 value={fechaFinValue}
                 onChange={(e) => setFechaFinValue(e.target.value)}
                 min={fechaInicioValue || undefined}
+                max={todayIso}
               />
             </div>
           )}

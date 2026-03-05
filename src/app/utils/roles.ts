@@ -54,7 +54,7 @@ export const canManageServicios = (role?: AdminRole | null) =>
   role === 'superadmin' || role === 'date' || role === 'jefe';
 
 export const canCreateServicios = (role?: AdminRole | null) =>
-  role === 'superadmin' || role === 'date';
+  role === 'superadmin' || role === 'jefe';
 
 export const canDeleteServicios = (role?: AdminRole | null) =>
   role === 'superadmin' || role === 'date';

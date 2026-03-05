@@ -5,7 +5,7 @@ import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { VistaPrevia } from '../hoja-vida/VistaPrevia';
 import { apiClient } from '../../api/client';
-import { updatePostulacion } from '../../api/postulaciones';
+import { fetchPostulacionesByPersona, updatePostulacion } from '../../api/postulaciones';
 import {
   downloadHojaVidaPdf,
   fetchHojaVidaDatos,
@@ -70,6 +70,7 @@ export function DetallePostulacionAdmin({
   const [hvDeclaraciones, setHvDeclaraciones] = useState<any[]>([]);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [downloadPdfError, setDownloadPdfError] = useState<string | null>(null);
+  const [otrasOficinasZonales, setOtrasOficinasZonales] = useState<string[]>([]);
 
   const handleGuardarEstado = async () => {
     if (!adminUserId) {
@@ -106,6 +107,44 @@ export function DetallePostulacionAdmin({
       setIsSaving(false);
     }
   };
+
+  useEffect(() => {
+    let isActive = true;
+    const loadOtrasOZ = async () => {
+      if (!postulacion.idPersona) {
+        if (isActive) {
+          setOtrasOficinasZonales([]);
+        }
+        return;
+      }
+      try {
+        const items = await fetchPostulacionesByPersona(Number(postulacion.idPersona));
+        if (!isActive) return;
+        const currentOz = (postulacion.oficinaZonal || '').trim().toUpperCase();
+        const currentConvId = String(postulacion.idConvocatoria || '');
+        const ozMap = new Map<string, string>();
+        items.forEach((item) => {
+          const ozRaw = String(item.oficinaZonal || '').trim();
+          if (!ozRaw) return;
+          const ozKey = ozRaw.toUpperCase();
+          if (currentConvId && String(item.idConvocatoria ?? '') === currentConvId) return;
+          if (currentOz && ozKey === currentOz) return;
+          if (!ozMap.has(ozKey)) {
+            ozMap.set(ozKey, ozRaw);
+          }
+        });
+        setOtrasOficinasZonales(Array.from(ozMap.values()));
+      } catch {
+        if (isActive) {
+          setOtrasOficinasZonales([]);
+        }
+      }
+    };
+    loadOtrasOZ();
+    return () => {
+      isActive = false;
+    };
+  }, [postulacion.idPersona, postulacion.idConvocatoria, postulacion.oficinaZonal]);
 
   useEffect(() => {
     let isActive = true;
@@ -376,6 +415,11 @@ export function DetallePostulacionAdmin({
         return <Badge variant="secondary">{estado}</Badge>;
     }
   };
+  const formatOzLabel = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return /^oz\b/i.test(trimmed) ? trimmed : `OZ ${trimmed}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -425,6 +469,19 @@ export function DetallePostulacionAdmin({
                 {postulacion.numeroContrato ? ` Contrato: ${postulacion.numeroContrato}.` : ''}
                 {postulacion.oficinaZonalContrato ? ` Oficina Zonal: ${postulacion.oficinaZonalContrato}.` : ''}
                 {postulacion.fechaFinContrato ? ` Fecha fin: ${postulacion.fechaFinContrato}.` : ''}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+      {otrasOficinasZonales.length > 0 && (
+        <Card className="p-4 bg-amber-50 border-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Alerta</p>
+              <p className="text-sm text-amber-800 mt-1">
+                Ciudadano postulando en {otrasOficinasZonales.map(formatOzLabel).join(', ')}
               </p>
             </div>
           </div>

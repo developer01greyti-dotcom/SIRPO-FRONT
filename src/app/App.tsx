@@ -1228,7 +1228,7 @@ export default function App() {
           onLogout={handleAdminLogout} 
         />
 
-        <main className="ml-64 p-8">
+        <main className="p-4 pl-20 md:ml-64 md:p-8 md:pl-0">
           {adminSection === 'registros' && (
             <GestionPostulaciones 
               convocatorias={convocatorias}

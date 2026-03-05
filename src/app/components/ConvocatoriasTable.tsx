@@ -109,9 +109,10 @@ export function ConvocatoriasTable({
   };
 
   const isWithinRange = (inicio: string, fin: string) => {
+    if (!inicio && !fin) return true;
     const startDate = parseDate(inicio);
     const endDate = parseDate(fin);
-    if (!startDate || !endDate) return false;
+    if (!startDate || !endDate) return true;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const start = new Date(startDate);

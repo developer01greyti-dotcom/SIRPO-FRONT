@@ -32,6 +32,7 @@ interface ConvocatoriaAdmin extends ConvocatoriaListItem {
   numeroVacantes?: number;
   requisitosMinimos?: string;
   funcionesPrincipales?: string;
+  resultadosEsperados?: string;
   salarioMin?: number;
   salarioMax?: number;
   idArchivoBases?: number;
@@ -445,24 +446,6 @@ export function GestionConvocatorias({
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Fecha inicio</label>
-                <Input
-                  type="date"
-                  value={filters.fechaInicio}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, fechaInicio: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Fecha fin</label>
-                <Input
-                  type="date"
-                  value={filters.fechaFin}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, fechaFin: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Búsqueda (Título)</label>
                 <Input
                   type="text"
@@ -492,8 +475,6 @@ export function GestionConvocatorias({
                   <TableHead className="font-semibold">Servicio</TableHead> 
                   <TableHead className="font-semibold">Categoría</TableHead> 
                   <TableHead className="font-semibold">Oficina de Coordinación</TableHead> 
-                  <TableHead className="font-semibold">Fecha Inicio</TableHead> 
-                  <TableHead className="font-semibold">Fecha Fin</TableHead> 
                   <TableHead className="font-semibold">Estado</TableHead> 
                   <TableHead className="font-semibold text-center">Acciones</TableHead> 
                 </TableRow> 
@@ -501,19 +482,19 @@ export function GestionConvocatorias({
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-gray-500 py-6">
+                    <TableCell colSpan={5} className="text-center text-sm text-gray-500 py-6">
                       Cargando servicios...
                     </TableCell>
                   </TableRow>
                 ) : loadError ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-red-600 py-6">
+                    <TableCell colSpan={5} className="text-center text-sm text-red-600 py-6">
                       {loadError}
                     </TableCell>
                   </TableRow>
                 ) : convocatorias.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-gray-500 py-6">
+                    <TableCell colSpan={5} className="text-center text-sm text-gray-500 py-6">
                       No se encontraron servicios.
                     </TableCell>
                   </TableRow>
@@ -529,8 +510,6 @@ export function GestionConvocatorias({
                         </span> 
                       </TableCell> 
                       <TableCell>{conv.oficinaCoordinacion}</TableCell> 
-                      <TableCell className="text-sm text-gray-600">{conv.fechaInicio}</TableCell> 
-                      <TableCell className="text-sm text-gray-600">{conv.fechaFin}</TableCell> 
                       <TableCell>{getEstadoBadge(conv.estado)}</TableCell> 
                       <TableCell>
                         <div className="flex items-center justify-center gap-2">
