@@ -54,6 +54,7 @@ export function GestionConvocatorias({
   const canCreate = canCreateServicios(adminRole);
   const canEdit = canManageServicios(adminRole);
   const canDelete = canDeleteServicios(adminRole);
+  const isJefe = adminRole === 'jefe';
   const [convocatorias, setConvocatorias] = useState<ConvocatoriaAdmin[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -349,9 +350,16 @@ export function GestionConvocatorias({
                       setOficinaQuery(selected.oficinaCoordinacion);
                     }
                   }}
+                  disabled={isJefe}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Buscar oficina de coordinación" />
+                    <SelectValue
+                      placeholder={
+                        isJefe
+                          ? adminOficinaZonal || 'OZ asignada'
+                          : 'Buscar oficina de coordinación'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent
                     onOpenAutoFocus={(event) => event.preventDefault()}
@@ -373,6 +381,7 @@ export function GestionConvocatorias({
                           autoFocus
                           onKeyDown={(e) => e.stopPropagation()}
                           className="w-[85%]"
+                          disabled={isJefe}
                         />
                         <Button
                           type="button"
@@ -387,6 +396,7 @@ export function GestionConvocatorias({
                             const input = document.querySelector('input[placeholder="Escribe al menos 3 caracteres"]') as HTMLInputElement | null;
                             input?.focus();
                           }}
+                          disabled={isJefe}
                         >
                           Limpiar
                         </Button>
