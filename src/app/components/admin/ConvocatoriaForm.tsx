@@ -56,6 +56,8 @@ interface ConvocatoriaFormProps {
   isEditing: boolean;
   usuarioAccion: number;
   adminRole?: AdminRole;
+  adminOficinaZonalId?: number;
+  adminOficinaZonal?: string;
   onGuardar: () => void;
   onCancelar: () => void;
 }
@@ -91,6 +93,8 @@ export function ConvocatoriaForm({
   isEditing,
   usuarioAccion,
   adminRole,
+  adminOficinaZonalId,
+  adminOficinaZonal,
   onGuardar,
   onCancelar,
 }: ConvocatoriaFormProps) {
@@ -112,6 +116,16 @@ export function ConvocatoriaForm({
   const canEditGeneral = !adminRole || isSuperadmin || isJefe;
   const canEditDetalle = !adminRole || isSuperadmin || isDate;
   const canEditBases = !adminRole || isSuperadmin || isDate;
+  const normalizeOz = (value?: string) => (value || '').trim().toUpperCase();
+  const matchesJefeOz = (item: OficinaZonalCoordinacionItem) => {
+    if (adminOficinaZonalId && String(item.idOficinaZonal) === String(adminOficinaZonalId)) {
+      return true;
+    }
+    if (adminOficinaZonal) {
+      return normalizeOz(item.oficinaZonal) === normalizeOz(adminOficinaZonal);
+    }
+    return false;
+  };
   const initialConocimientoIds = parseConocimientoIds(convocatoria?.conocimientosIds);
   const initialConocimientoNames = normalizeConocimientos(convocatoria?.conocimientos);
   const [perfilOptions, setPerfilOptions] = useState<DropdownItem[]>([]);
@@ -202,6 +216,18 @@ export function ConvocatoriaForm({
     '--kn-accent-2': '#0ea5e9',
   } as CSSProperties;
 
+  useEffect(() => {
+    if (!isJefe) return;
+    setFormData((prev) => ({
+      ...prev,
+      idOficinaZonal: prev.idOficinaZonal || (adminOficinaZonalId ? String(adminOficinaZonalId) : ''),
+      oficinaZonal: prev.oficinaZonal || adminOficinaZonal || '',
+    }));
+    if (adminOficinaZonal && !oficinaQuery) {
+      setOficinaQuery(adminOficinaZonal);
+    }
+  }, [isJefe, adminOficinaZonalId, adminOficinaZonal]);
+
   useEffect(() => { 
     if (!convocatoria) { 
       setFormData({ 
@@ -210,7 +236,7 @@ export function ConvocatoriaForm({
         idPerfil: '', 
         idOficinaZonal: '', 
         idOficinaCoordinacion: '', 
-        oficinaZonal: '', 
+        oficinaZonal: isJefe ? adminOficinaZonal || '' : '', 
         tipoContrato: '', 
         numeroVacantes: '', 
         fechaInicio: '', 
@@ -230,7 +256,7 @@ export function ConvocatoriaForm({
       setConocimientoInput('');
       setConocimientoError('');
       setPendingConocimientoNames([]);
-      setOficinaQuery('');
+      setOficinaQuery(isJefe ? adminOficinaZonal || '' : '');
       setOficinaOptions([]);
       return;
     }
@@ -364,6 +390,9 @@ export function ConvocatoriaForm({
           const selectedId = formData.idOficinaCoordinacion;
           const selectedLabel = oficinaQuery;
           let nextItems = items || [];
+          if (isJefe && (adminOficinaZonalId || adminOficinaZonal)) {
+            nextItems = nextItems.filter(matchesJefeOz);
+          }
           if (selectedId && selectedLabel) {
             const exists = nextItems.some(
               (item) => String(item.idOficinaCoordinacion) === String(selectedId),
@@ -379,6 +408,15 @@ export function ConvocatoriaForm({
                 ...nextItems,
               ];
             }
+          }
+          if (isJefe && !formData.idOficinaCoordinacion && nextItems.length > 0) {
+            const first = nextItems[0];
+            setFormData((prev) => ({
+              ...prev,
+              idOficinaCoordinacion: String(first.idOficinaCoordinacion),
+              idOficinaZonal: first.idOficinaZonal ? String(first.idOficinaZonal) : prev.idOficinaZonal,
+              oficinaZonal: first.oficinaZonal ?? prev.oficinaZonal,
+            }));
           }
           setOficinaOptions(nextItems);
         }
@@ -612,7 +650,7 @@ export function ConvocatoriaForm({
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: '#04a25c' }}>
+          <h1 className="text-3xl font-bold mt-1" style={{ color: '#04a25c' }}>
             {isEditing ? 'Editar Servicio' : 'Nuevo Servicio'}
           </h1>
           <p className="mt-2 font-bold" style={{ color: '#108cc9' }}>
@@ -684,6 +722,9 @@ export function ConvocatoriaForm({
                     const selected = oficinaOptions.find( 
                       (item) => String(item.idOficinaCoordinacion) === value, 
                     ); 
+                    if (isJefe && selected && !matchesJefeOz(selected)) {
+                      return;
+                    }
                     setFormData((prev) => ({ 
                       ...prev, 
                       idOficinaCoordinacion: value, 
@@ -694,10 +735,16 @@ export function ConvocatoriaForm({
                       setOficinaQuery(selected.oficinaCoordinacion); 
                     } 
                   }} 
-                  disabled={!canEditGeneral}
+                  disabled={!canEditGeneral || isJefe}
                 > 
                   <SelectTrigger id="oficinaCoordinacion"> 
-                    <SelectValue placeholder="Buscar oficina de Coordinación" /> 
+                    <SelectValue
+                      placeholder={
+                        isJefe
+                          ? adminOficinaZonal || 'OZ asignada'
+                          : 'Buscar oficina de Coordinación'
+                      }
+                    /> 
                   </SelectTrigger> 
                   <SelectContent 
                     onOpenAutoFocus={(event) => event.preventDefault()} 
@@ -717,15 +764,15 @@ export function ConvocatoriaForm({
                               setFormData((prev) => ({ 
                                 ...prev, 
                                 idOficinaCoordinacion: '', 
-                                idOficinaZonal: '', 
-                                oficinaZonal: '',
+                                idOficinaZonal: isJefe ? prev.idOficinaZonal : '', 
+                                oficinaZonal: isJefe ? prev.oficinaZonal : '',
                               })); 
                             } 
                           }} 
                           autoFocus 
                           onKeyDown={(e) => e.stopPropagation()} 
                           className="w-[85%]" 
-                          disabled={!canEditGeneral}
+                          disabled={!canEditGeneral || isJefe}
                         /> 
                         <Button 
                           type="button" 
@@ -738,14 +785,14 @@ export function ConvocatoriaForm({
                             setFormData((prev) => ({ 
                               ...prev, 
                               idOficinaCoordinacion: '', 
-                              idOficinaZonal: '', 
-                              oficinaZonal: '',
+                              idOficinaZonal: isJefe ? prev.idOficinaZonal : '', 
+                              oficinaZonal: isJefe ? prev.oficinaZonal : '',
                             })); 
                             setOficinaOptions([]); 
                             const input = document.getElementById('oficinaCoordSearch') as HTMLInputElement | null; 
                             input?.focus(); 
                           }} 
-                          disabled={!canEditGeneral}
+                          disabled={!canEditGeneral || isJefe}
                         > 
                           Limpiar 
                         </Button> 

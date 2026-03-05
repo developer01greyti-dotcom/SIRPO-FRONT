@@ -8,6 +8,7 @@ interface AdminSidebarProps {
   onLogout: () => void;
   userRole?: AdminRole | null;
   userName?: string;
+  adminOficinaZonal?: string;
 }
 
 export function AdminSidebar({
@@ -16,6 +17,7 @@ export function AdminSidebar({
   onLogout,
   userRole,
   userName,
+  adminOficinaZonal,
 }: AdminSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const showLabels = !collapsed;
@@ -89,6 +91,9 @@ export function AdminSidebar({
               <div className="hidden md:block flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">{userName}</p>
                 <p className="text-xs text-green-200">{getRoleLabel(userRole)}</p>
+                {adminOficinaZonal && (
+                  <p className="text-xs text-green-200 truncate">OZ: {adminOficinaZonal}</p>
+                )}
               </div>
             )}
           </div>

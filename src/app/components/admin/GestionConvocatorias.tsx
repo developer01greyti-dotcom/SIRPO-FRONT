@@ -279,6 +279,8 @@ export function GestionConvocatorias({
         isEditing={isEditing}
         adminRole={adminRole}
         usuarioAccion={adminUserId}
+        adminOficinaZonalId={adminOficinaZonalId}
+        adminOficinaZonal={adminOficinaZonal}
         onGuardar={async () => {
           await loadConvocatorias();
           setShowForm(false);

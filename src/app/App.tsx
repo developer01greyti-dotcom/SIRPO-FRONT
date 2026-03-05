@@ -1225,6 +1225,7 @@ export default function App() {
           }}
           userRole={adminRole}
           userName={adminUserName}
+          adminOficinaZonal={adminOficinaZonal || undefined}
           onLogout={handleAdminLogout} 
         />
 
