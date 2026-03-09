@@ -116,13 +116,15 @@ export function ConvocatoriaForm({
   const canEditGeneral = !adminRole || isSuperadmin || isJefe;
   const canEditDetalle = !adminRole || isSuperadmin || isDate;
   const canEditBases = !adminRole || isSuperadmin || isDate;
-  const normalizeOz = (value?: string) => (value || '').trim().toUpperCase();
+  const normalizeOz = (value?: string) =>
+    (value || '').replace(/^OZ\s+/i, '').trim().toUpperCase();
+  const adminOzNormalized = normalizeOz(adminOficinaZonal);
   const matchesJefeOz = (item: OficinaZonalCoordinacionItem) => {
     if (adminOficinaZonalId && String(item.idOficinaZonal) === String(adminOficinaZonalId)) {
       return true;
     }
     if (adminOficinaZonal) {
-      return normalizeOz(item.oficinaZonal) === normalizeOz(adminOficinaZonal);
+      return normalizeOz(item.oficinaZonal) === adminOzNormalized;
     }
     return false;
   };
@@ -223,10 +225,10 @@ export function ConvocatoriaForm({
       idOficinaZonal: prev.idOficinaZonal || (adminOficinaZonalId ? String(adminOficinaZonalId) : ''),
       oficinaZonal: prev.oficinaZonal || adminOficinaZonal || '',
     }));
-    if (adminOficinaZonal && !oficinaQuery) {
-      setOficinaQuery(adminOficinaZonal);
+    if (adminOzNormalized && !oficinaQuery) {
+      setOficinaQuery(adminOzNormalized);
     }
-  }, [isJefe, adminOficinaZonalId, adminOficinaZonal]);
+  }, [isJefe, adminOficinaZonalId, adminOficinaZonal, adminOzNormalized]);
 
   useEffect(() => { 
     if (!convocatoria) { 
@@ -256,7 +258,7 @@ export function ConvocatoriaForm({
       setConocimientoInput('');
       setConocimientoError('');
       setPendingConocimientoNames([]);
-      setOficinaQuery(isJefe ? adminOficinaZonal || '' : '');
+      setOficinaQuery(isJefe ? adminOzNormalized || '' : '');
       setOficinaOptions([]);
       return;
     }
@@ -585,11 +587,39 @@ export function ConvocatoriaForm({
 
     setIsSubmitting(true);
     try {
+      let idOficinaCoordinacion = formData.idOficinaCoordinacion;
+      if (isJefe && (!idOficinaCoordinacion || Number(idOficinaCoordinacion) <= 0)) {
+        const lookupQuery = adminOzNormalized || adminOficinaZonal || '';
+        if (lookupQuery) {
+          try {
+            const items = await fetchOficinaCoordinacionList(lookupQuery);
+            const filtered = (items || []).filter(matchesJefeOz);
+            if (filtered.length > 0) {
+              const first = filtered[0];
+              idOficinaCoordinacion = String(first.idOficinaCoordinacion);
+              setFormData((prev) => ({
+                ...prev,
+                idOficinaCoordinacion,
+                idOficinaZonal: first.idOficinaZonal ? String(first.idOficinaZonal) : prev.idOficinaZonal,
+                oficinaZonal: first.oficinaZonal ?? prev.oficinaZonal,
+              }));
+            }
+          } catch {
+            // ignore lookup errors, we'll validate below
+          }
+        }
+        if (!idOficinaCoordinacion || Number(idOficinaCoordinacion) <= 0) {
+          setError('No se encontró la oficina de coordinación para la OZ asignada.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const payload: ConvocatoriaUpsertPayload = {
         idConvocatoria: Number(formData.idConvocatoria || 0),
         titulo: formData.titulo,
         idPerfil: Number(formData.idPerfil),
-        idOficinaCoordinacion: Number(formData.idOficinaCoordinacion || 0),
+        idOficinaCoordinacion: Number(idOficinaCoordinacion || 0),
         tipoContrato: formData.tipoContrato || '',
         numeroVacantes: Number(formData.numeroVacantes || 0),
         fechaInicio,
