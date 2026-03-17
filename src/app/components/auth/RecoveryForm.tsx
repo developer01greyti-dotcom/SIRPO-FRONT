@@ -1,4 +1,4 @@
-﻿import { Send, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Send, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -13,7 +13,7 @@ interface RecoveryFormProps {
 
 export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
   const [submitted, setSubmitted] = useState(false);
-  const [email, setEmail] = useState('');
+  const [numeroDocumento, setNumeroDocumento] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -21,14 +21,14 @@ export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
     e.preventDefault();
     if (isSubmitting) return;
     setFormError('');
-    const trimmed = email.trim();
-    if (!trimmed) {
-      setFormError('Ingrese su correo electrónico.');
+    const docValue = numeroDocumento.trim();
+    if (!docValue) {
+      setFormError('Ingrese su número de DNI.');
       return;
     }
     try {
       setIsSubmitting(true);
-      const ok = await requestPasswordRecovery(trimmed);
+      const ok = await requestPasswordRecovery(docValue);
       if (!ok) {
         setFormError('No se pudo enviar el correo de recuperación.');
         return;
@@ -52,7 +52,7 @@ export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Correo Enviado</h2>
             <p className="text-gray-600 mb-6">
-              Hemos enviado las instrucciones para restablecer tu contraseña al correo electrónico proporcionado.
+              Hemos enviado un enlace y una contraseña temporal al correo asociado al DNI proporcionado.
             </p>
             <p className="text-sm text-gray-500 mb-6">
               Si no recibes el correo en los próximos minutos, verifica tu carpeta de spam.
@@ -94,7 +94,7 @@ export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
           </div>
           <h1 className="text-2xl font-bold" style={{ color: '#04a25c' }}>Recuperar contraseña</h1>
           <p className="text-sm mt-2 font-bold" style={{ color: '#108cc9' }}>
-            Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña
+            Ingresa tu DNI y te enviaremos instrucciones para restablecer tu contraseña
           </p>
         </div>
 
@@ -106,27 +106,24 @@ export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
                 {formError}
               </div>
             )}
-            {/* Email */}
+
             <div className="space-y-2">
-              <Label htmlFor="email">Correo electrónico</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="correo@ejemplo.com"
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+              <Label htmlFor="numeroDocumento">DNI</Label>
+              <Input
+                id="numeroDocumento"
+                type="text"
+                value={numeroDocumento}
+                onChange={(e) => setNumeroDocumento(e.target.value)}
+                maxLength={8}
+                placeholder="Número de DNI"
+                required
+              />
             </div>
 
             {/* Info */}
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
               <p className="text-sm text-blue-900">
-                Te enviaremos un enlace a tu correo electrónico para que puedas crear una nueva contraseña.
+                Te enviaremos un enlace y una contraseña temporal al correo asociado a tu DNI.
               </p>
             </div>
 
@@ -150,4 +147,3 @@ export function RecoveryForm({ onNavigateToLogin }: RecoveryFormProps) {
     </div>
   );
 }
-

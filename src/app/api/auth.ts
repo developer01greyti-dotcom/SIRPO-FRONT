@@ -92,6 +92,10 @@ export interface LoginResponse {
   estadoCivil?: string;
   tipoUsuario?: number | string;
   token?: string;
+  mustChangePassword?: boolean;
+  resetToken?: string;
+  passwordTemporal?: string | number;
+  passwordTemporalExpira?: string;
 }
 
 export const loginPostulante = async (
@@ -109,7 +113,29 @@ export const loginPostulante = async (
   return token ? { ...normalized, token } : normalized;
 };
 
-export const requestPasswordRecovery = async (email: string): Promise<boolean> => {
-  const response = await apiClient.post('/usrpost_recovery', { email });
+export const requestPasswordRecovery = async (
+  numeroDocumento: string,
+): Promise<boolean> => {
+  const response = await apiClient.post('/usrpost_recov/list', {
+    numeroDocumento,
+  });
   return response.status >= 200 && response.status < 300;
+};
+
+export interface ChangePasswordPayload {
+  token: string;
+  passwordTemporal: string;
+  passwordNueva: string;
+}
+
+export interface ChangePasswordResponse {
+  ok?: boolean;
+  mensaje?: string;
+}
+
+export const changePasswordWithToken = async (
+  payload: ChangePasswordPayload,
+): Promise<ChangePasswordResponse> => {
+  const response = await apiClient.post('/usrpost_passchange/update', payload);
+  return response.data as ChangePasswordResponse;
 };

@@ -13,6 +13,7 @@ import { DetallePostulacion } from './components/DetallePostulacion';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { RecoveryForm } from './components/auth/RecoveryForm';
+import { ChangePasswordForm } from './components/auth/ChangePasswordForm';
 import { DatosPersonales } from './components/hoja-vida/DatosPersonales';
 import { FormacionAcademica } from './components/hoja-vida/FormacionAcademica';
 import { ExperienciaProfesional } from './components/hoja-vida/ExperienciaProfesional';
@@ -311,6 +312,8 @@ export default function App() {
     ? 'register'
     : initialPath === '/recuperarContrasena'
     ? 'recovery'
+    : initialPath === '/cambiarContrasena'
+    ? 'change-password'
     : 'login';
   const storedAuth = loadStoredAuthState();
   const toaster = <Toaster position="top-right" richColors />;
@@ -323,7 +326,7 @@ export default function App() {
   const [postulanteUser, setPostulanteUser] = useState<LoginResponse | null>(
     storedAuth.postulanteUser,
   );
-  const [authView, setAuthView] = useState<'login' | 'register' | 'recovery'>(initialAuthView);
+  const [authView, setAuthView] = useState<'login' | 'register' | 'recovery' | 'change-password'>(initialAuthView);
   const [activeSection, setActiveSection] = useState(
     storedAuth.activeSection || 'hoja-vida',
   );
@@ -462,10 +465,17 @@ export default function App() {
           setAuthView('register');
         } else if (path === '/recuperarContrasena') {
           setAuthView('recovery');
+        } else if (path === '/cambiarContrasena') {
+          setAuthView('change-password');
         } else {
           setAuthView('login');
         }
-        if (path !== '/login' && path !== '/registroUsuario' && path !== '/recuperarContrasena') {
+        if (
+          path !== '/login' &&
+          path !== '/registroUsuario' &&
+          path !== '/recuperarContrasena' &&
+          path !== '/cambiarContrasena'
+        ) {
           navigate('/login', { replace: true });
         }
       }
@@ -490,7 +500,8 @@ export default function App() {
           path === '/' || 
           path === '/login' || 
           path === '/registroUsuario' || 
-          path === '/recuperarContrasena' 
+          path === '/recuperarContrasena' ||
+          path === '/cambiarContrasena'
         ) {
           navigate('/hojaVida', { replace: true });
         }
@@ -607,6 +618,19 @@ export default function App() {
         user.token,
       );
       navigate('/admin/registros', { replace: true });
+      return;
+    }
+
+    const mustChange =
+      Boolean((user as any)?.mustChangePassword) || Boolean((user as any)?.resetToken);
+    if (mustChange) {
+      const token = String((user as any)?.resetToken || '');
+      setAuthView('change-password');
+      if (token) {
+        navigate(`/cambiarContrasena?token=${encodeURIComponent(token)}`, { replace: true });
+      } else {
+        navigate('/cambiarContrasena', { replace: true });
+      }
       return;
     }
 
@@ -1193,6 +1217,16 @@ export default function App() {
           {toaster}
           {globalLoading}
           <RecoveryForm onNavigateToLogin={() => navigate('/login')} />
+        </>
+      );
+    }
+
+    if (authView === 'change-password') {
+      return (
+        <>
+          {toaster}
+          {globalLoading}
+          <ChangePasswordForm onNavigateToLogin={() => navigate('/login')} />
         </>
       );
     }

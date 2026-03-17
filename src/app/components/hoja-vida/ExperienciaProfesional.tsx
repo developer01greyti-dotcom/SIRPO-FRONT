@@ -280,8 +280,9 @@ export function ExperienciaProfesional({
 
   const formatFecha = (fecha: string) => {
     if (!fecha) return '-';
-    const date = new Date(fecha);
-    return date.toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
+    const parsed = parseFecha(fecha);
+    if (!parsed) return fecha;
+    return parsed.toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const calcularTotalExperiencia = (items: Experiencia[]) => {

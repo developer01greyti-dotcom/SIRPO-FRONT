@@ -20,6 +20,8 @@ import {
 
   fetchTipoDocDropdown,
 
+  fetchUbigeoDistritoById,
+
   fetchUbigeoDistritoList,
 
   type DropdownItem,
@@ -39,6 +41,7 @@ import {
   saveHvRefArchivo,
 
 } from '../../api/hvRefArchivo';
+import { fetchProtectedFileBlob } from '../../utils/filePreview';
 
 
 
@@ -297,6 +300,8 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
     return raw.includes('dni') || raw.includes('documento nacional');
   }, [formData.tipoDocumento, tipoDocumentoOptions]);
 
+  const sanitizeUbigeoInput = (value: string) => value.replace(/\d/g, '');
+
   const normalizeDropdownLabel = (value: string) => value.trim().toLowerCase();
 
   const resolveDropdownId = (
@@ -445,6 +450,51 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
     };
 
   }, [ubigeoQuery]);
+
+  const resolveUbigeoByCode = async (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!/^\d{6}$/.test(code)) return;
+    const variants = Array.from(
+      new Set([code, code.replace(/^0+/, '')].filter(Boolean)),
+    );
+    setIsUbigeoLoading(true);
+    try {
+      let items: DropdownItem[] = [];
+      for (const variant of variants) {
+        const list = await fetchUbigeoDistritoList(variant);
+        if (list.length > 0) {
+          items = list;
+          break;
+        }
+      }
+      if (items.length === 0) {
+        for (const variant of variants) {
+          const item = await fetchUbigeoDistritoById(variant);
+          if (item) {
+            items = [item];
+            break;
+          }
+        }
+      }
+      if (items.length > 0) {
+        const selected = items.find((item) => String(item.id) === code) ?? items[0];
+        setUbigeoOptions(items);
+        updateField('distrito', String(selected?.id ?? code));
+        setUbigeoQuery(selected?.descripcion || code);
+        return;
+      }
+      setUbigeoOptions([]);
+      updateField('distrito', code);
+      setUbigeoQuery(code);
+    } catch (error) {
+      console.error('Error loading ubigeo by code', error);
+      setUbigeoOptions([]);
+      updateField('distrito', code);
+      setUbigeoQuery(code);
+    } finally {
+      setIsUbigeoLoading(false);
+    }
+  };
 
 
 
@@ -802,7 +852,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
 
 
-  const openFile = (
+  const openFile = async (
 
     url: string | null,
 
@@ -813,10 +863,15 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
   ) => {
 
     if (!url) return;
+    const blob = await fetchProtectedFileBlob(url);
+    const previewUrl = blob ? URL.createObjectURL(blob) : url;
 
     if (mime && mime.toLowerCase().includes('pdf')) {
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+      if (blob) {
+        setTimeout(() => URL.revokeObjectURL(previewUrl), 30000);
+      }
 
       return;
 
@@ -824,7 +879,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
     if (type === 'seguro') {
 
-      setSeguroSaludPreview(url);
+      setSeguroSaludPreview(previewUrl);
 
       setShowSeguroSaludModal(true);
 
@@ -834,7 +889,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
     if (type === 'sctr') {
 
-      setSctrPreview(url);
+      setSctrPreview(previewUrl);
 
       setShowSctrModal(true);
 
@@ -843,7 +898,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
     }
     if (type === 'rnp') {
 
-      setRnpPreview(url);
+      setRnpPreview(previewUrl);
 
       setShowRnpModal(true);
 
@@ -851,7 +906,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
     }
 
-    setVoucherPreview(url);
+    setVoucherPreview(previewUrl);
 
     setShowVoucherModal(true);
 
@@ -1956,7 +2011,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
                           className="gap-2"
 
-                          onClick={() => openFile(voucherPreview || voucherFileUrl, voucherMime || (voucherFile?.type ?? null), 'voucher')}
+                          onClick={() => void openFile(voucherPreview || voucherFileUrl, voucherMime || (voucherFile?.type ?? null), 'voucher')}
 
                         >
 
@@ -2071,7 +2126,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
                           className="gap-2"
 
-                          onClick={() => openFile(rnpPreview || rnpFileUrl, rnpMime || (rnpFile?.type ?? null), 'rnp')}
+                          onClick={() => void openFile(rnpPreview || rnpFileUrl, rnpMime || (rnpFile?.type ?? null), 'rnp')}
 
                         >
 
@@ -2186,7 +2241,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
                           className="gap-2"
 
-                          onClick={() => openFile(seguroSaludPreview || seguroFileUrl, seguroMime || (seguroSaludFile?.type ?? null), 'seguro')}
+                          onClick={() => void openFile(seguroSaludPreview || seguroFileUrl, seguroMime || (seguroSaludFile?.type ?? null), 'seguro')}
 
                         >
 
@@ -2302,7 +2357,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
                           className="gap-2"
 
-                          onClick={() => openFile(sctrPreview || sctrFileUrl, sctrMime || (sctrFile?.type ?? null), 'sctr')}
+                          onClick={() => void openFile(sctrPreview || sctrFileUrl, sctrMime || (sctrFile?.type ?? null), 'sctr')}
 
                         >
 
@@ -2443,7 +2498,11 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
                   } else if (value) {
 
-                    setUbigeoQuery(value);
+                    if (/^\d{6}$/.test(value)) {
+                      void resolveUbigeoByCode(value);
+                    } else {
+                      setUbigeoQuery(value);
+                    }
 
                   }
 
@@ -2477,7 +2536,7 @@ export function DatosPersonales({ user, isLocked = false }: DatosPersonalesProps
 
                         onChange={(e) => {
 
-                          const value = e.target.value;
+                          const value = sanitizeUbigeoInput(e.target.value);
 
                           setUbigeoQuery(value);
 

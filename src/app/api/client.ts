@@ -81,7 +81,8 @@ const isAuthEndpoint = (url?: string) => {
   return (
     url.includes('/usrpost_login') ||
     url.includes('/usrpost_reg') ||
-    url.includes('/usrpost_recovery') ||
+    url.includes('/usrpost_recov') ||
+    url.includes('/usrpost_passchange') ||
     url.includes('/admLogin') ||
     url.includes('/adm_login')
   );
@@ -94,6 +95,7 @@ const isPublicRoute = () => {
     path.endsWith('/login') ||
     path.endsWith('/registroUsuario') ||
     path.endsWith('/recuperarContrasena') ||
+    path.startsWith('/cambiarContrasena') ||
     path.endsWith('/admin/login')
   );
 };

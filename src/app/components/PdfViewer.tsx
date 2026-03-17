@@ -1,6 +1,8 @@
 import { ArrowLeft, Download } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
+import { downloadProtectedFile, fetchProtectedFileBlob } from '../utils/filePreview';
 
 interface PdfViewerProps {
   url: string;
@@ -9,21 +11,32 @@ interface PdfViewerProps {
 }
 
 export function PdfViewer({ url, title, onVolver }: PdfViewerProps) {
+  const [resolvedUrl, setResolvedUrl] = useState(url);
+
+  useEffect(() => {
+    let active = true;
+    let blobUrl = '';
+    const load = async () => {
+      const blob = await fetchProtectedFileBlob(url);
+      if (!active) return;
+      if (blob) {
+        blobUrl = URL.createObjectURL(blob);
+        setResolvedUrl(blobUrl);
+        return;
+      }
+      setResolvedUrl(url);
+    };
+    load();
+    return () => {
+      active = false;
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [url]);
+
   const handleDownload = async () => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `${title}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (error) {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
+    await downloadProtectedFile(url, `${title}.pdf`);
   };
 
   return (
@@ -64,7 +77,7 @@ export function PdfViewer({ url, title, onVolver }: PdfViewerProps) {
       <Card className="p-6">
         <div className="w-full h-[calc(100vh-250px)]">
           <iframe
-            src={url}
+            src={resolvedUrl}
             className="w-full h-full rounded-md border border-gray-200"
             title={title}
           />

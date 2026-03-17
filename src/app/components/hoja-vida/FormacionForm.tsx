@@ -9,6 +9,7 @@ import {
   fetchNivelEstudioDropdown,
   fetchTipoEntidadDropdown,
   fetchTipoInstitucionDropdown,
+  fetchUbigeoDistritoById,
   fetchUbigeoDistritoList,
   type DropdownItem,
 } from '../../api/catalogos';
@@ -16,6 +17,7 @@ import { upsertHvForm } from '../../api/hojaVida';
 import { deleteHvRefArchivo, fetchHvRefArchivo, saveHvRefArchivo } from '../../api/hvRefArchivo';
 import { PAISES_CATALOGO } from '../../data/paises';
 import { pedirRUC } from '../../api/pide';
+import { previewProtectedFile } from '../../utils/filePreview';
 
 interface Formacion {
   id: string;
@@ -96,6 +98,9 @@ export function FormacionForm({
   const getPaisDescripcion = (value: string) =>
     PAISES_CATALOGO.find((item) => item.id === value)?.descripcion || '';
 
+  const sanitizeUbigeoInput = (value: string) => value.replace(/\d/g, '');
+
+
   const pickValue = (data: any, keys: string[]) => {
     if (!data) return '';
     for (const key of keys) {
@@ -157,6 +162,50 @@ export function FormacionForm({
       }
     };
   }, [ubigeoQuery]);
+
+  const resolveUbigeoByCode = async (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!/^\d{6}$/.test(code)) return;
+    const variants = Array.from(
+      new Set([code, code.replace(/^0+/, '')].filter(Boolean)),
+    );
+    setIsUbigeoLoading(true);
+    try {
+      let items: DropdownItem[] = [];
+      for (const variant of variants) {
+        const list = await fetchUbigeoDistritoList(variant);
+        if (list.length > 0) {
+          items = list;
+          break;
+        }
+      }
+      if (items.length === 0) {
+        for (const variant of variants) {
+          const item = await fetchUbigeoDistritoById(variant);
+          if (item) {
+            items = [item];
+            break;
+          }
+        }
+      }
+      if (items.length > 0) {
+        const selected = items.find((item) => String(item.id) === code) ?? items[0];
+        setUbigeoOptions(items);
+        setDistritoValue(String(selected?.id ?? code));
+        setUbigeoQuery(selected?.descripcion || code);
+        return;
+      }
+      setUbigeoOptions([]);
+      setDistritoValue(code);
+      setUbigeoQuery(code);
+    } catch (error) {
+      setUbigeoOptions([]);
+      setDistritoValue(code);
+      setUbigeoQuery(code);
+    } finally {
+      setIsUbigeoLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!pendingUbigeoId || ubigeoOptions.length === 0) return;
@@ -282,7 +331,7 @@ export function FormacionForm({
 
   const openDocumentoPreview = () => {
     if (!documentoPreview) return;
-    window.open(documentoPreview, '_blank', 'noopener,noreferrer');
+    void previewProtectedFile(documentoPreview);
   };
 
   const handleBuscarRuc = async () => {
@@ -555,7 +604,11 @@ export function FormacionForm({
                 if (selected) {
                   setUbigeoQuery(selected.descripcion);
                 } else if (value) {
-                  setUbigeoQuery(value);
+                  if (/^\d{6}$/.test(value)) {
+                    void resolveUbigeoByCode(value);
+                  } else {
+                    setUbigeoQuery(value);
+                  }
                 }
               }}
             >
@@ -574,7 +627,7 @@ export function FormacionForm({
                           placeholder="Escribe al menos 3 caracteres"
                           value={ubigeoQuery}
                           onChange={(e) => {
-                            const value = e.target.value;
+                            const value = sanitizeUbigeoInput(e.target.value);
                             setUbigeoQuery(value);
                             if (distritoValue) {
                               setDistritoValue('');

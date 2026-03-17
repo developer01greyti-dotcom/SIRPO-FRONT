@@ -11,12 +11,14 @@ import {
   fetchMotivoCeseDropdown,
   fetchTipoEntidadDropdown,
   fetchTipoExperienciaDropdown,
+  fetchUbigeoDistritoById,
   fetchUbigeoDistritoList,
   type DropdownItem,
 } from '../../api/catalogos';
 import { upsertHvExp } from '../../api/hojaVida';
 import { deleteHvRefArchivo, fetchHvRefArchivo, saveHvRefArchivo } from '../../api/hvRefArchivo';
 import { pedirRUC } from '../../api/pide';
+import { previewProtectedFile } from '../../utils/filePreview';
 
 interface Experiencia {
   id?: string;
@@ -110,6 +112,9 @@ export function ExperienciaForm({
     const byDesc = options.find((item) => item.descripcion.toLowerCase() === normalized);
     return byDesc ? String(byDesc.id) : '';
   };
+
+  const sanitizeUbigeoInput = (value: string) => value.replace(/\d/g, '');
+
 
   const pickValue = (data: any, keys: string[]) => {
     if (!data) return '';
@@ -254,6 +259,50 @@ export function ExperienciaForm({
       }
     };
   }, [ubigeoQuery]);
+
+  const resolveUbigeoByCode = async (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!/^\d{6}$/.test(code)) return;
+    const variants = Array.from(
+      new Set([code, code.replace(/^0+/, '')].filter(Boolean)),
+    );
+    setIsUbigeoLoading(true);
+    try {
+      let items: DropdownItem[] = [];
+      for (const variant of variants) {
+        const list = await fetchUbigeoDistritoList(variant);
+        if (list.length > 0) {
+          items = list;
+          break;
+        }
+      }
+      if (items.length === 0) {
+        for (const variant of variants) {
+          const item = await fetchUbigeoDistritoById(variant);
+          if (item) {
+            items = [item];
+            break;
+          }
+        }
+      }
+      if (items.length > 0) {
+        const selected = items.find((item) => String(item.id) === code) ?? items[0];
+        setUbigeoOptions(items);
+        setDistritoValue(String(selected?.id ?? code));
+        setUbigeoQuery(selected?.descripcion || code);
+        return;
+      }
+      setUbigeoOptions([]);
+      setDistritoValue(code);
+      setUbigeoQuery(code);
+    } catch (error) {
+      setUbigeoOptions([]);
+      setDistritoValue(code);
+      setUbigeoQuery(code);
+    } finally {
+      setIsUbigeoLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!pendingUbigeoId || ubigeoOptions.length === 0) return;
@@ -714,7 +763,11 @@ export function ExperienciaForm({
                 if (selected) {
                   setUbigeoQuery(selected.descripcion);
                 } else if (value) {
-                  setUbigeoQuery(value);
+                  if (/^\d{6}$/.test(value)) {
+                    void resolveUbigeoByCode(value);
+                  } else {
+                    setUbigeoQuery(value);
+                  }
                 }
               }}
             >
@@ -733,7 +786,7 @@ export function ExperienciaForm({
                       placeholder="Escribe al menos 3 caracteres"
                       value={ubigeoQuery}
                       onChange={(e) => {
-                        const value = e.target.value;
+                        const value = sanitizeUbigeoInput(e.target.value);
                         setUbigeoQuery(value);
                         if (distritoValue) {
                           setDistritoValue('');
@@ -806,7 +859,9 @@ export function ExperienciaForm({
               type="text"
               defaultValue={experiencia?.area || ''}
               placeholder=""
+              maxLength={100}
             />
+            <p className="text-xs text-gray-500">MÃ¡ximo 100 caracteres</p>
           </div>
 
           {/* Cargo */}
@@ -944,7 +999,7 @@ export function ExperienciaForm({
                       variant="outline"
                       size="sm"
                       className="gap-2"
-                      onClick={() => window.open(certificadoPreview || '', '_blank')}
+                      onClick={() => void previewProtectedFile(certificadoPreview || '')}
                     >
                       <Eye className="w-4 h-4" />
                       Ver

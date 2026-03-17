@@ -4,6 +4,7 @@ import { Button } from "../ui/button";
 import type { LoginResponse } from "../../api/auth";
 import { deleteHvDecl, fetchHojaVidaActual, fetchHvDeclList, upsertHvDecl } from "../../api/hojaVida";
 import { deleteHvRefArchivo, fetchHvRefArchivo, saveHvRefArchivo } from "../../api/hvRefArchivo";
+import { previewProtectedFile } from "../../utils/filePreview";
 
 export interface DeclaracionJurada {
   id: string;
@@ -302,7 +303,7 @@ export function DeclaracionesJuradas({ user }: { user: LoginResponse | null }) {
                               onClick={() => {
                                 if (!declaracion.archivoGuid) return;
                                 const url = buildFileUrl(declaracion.archivoGuid);
-                                window.open(url, "_blank", "noopener,noreferrer");
+                                void previewProtectedFile(url);
                               }}
                               className="gap-1 h-7 px-2"
                               title="Ver archivo adjunto"
